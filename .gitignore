@@ -161,8 +161,10 @@ cython_debug/
 #.idea/
 .ipynb_checkpoints
 data/ED/comet
+data/glove
 vectors
 *.log
 *.ipynb
 *.sh
 *.csv
+/data/glove/**
