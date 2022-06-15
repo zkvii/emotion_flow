@@ -1,7 +1,7 @@
 import torch
 import logging
 import argparse
-
+from util.common import print_opts
 
 UNK_idx = 0
 PAD_idx = 1
@@ -71,15 +71,7 @@ parser.add_argument("--depth", type=int, default=40)
 parser.add_argument("--filter", type=int, default=50)
 
 
-def print_opts(opts):
-    """Prints the values of all command-line arguments."""
-    print("=" * 80)
-    print("Opts".center(80))
-    print("-" * 80)
-    for key in opts.__dict__:
-        if opts.__dict__[key]:
-            print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
-    print("=" * 80)
+
 
 
 args = parser.parse_args()
@@ -114,7 +106,7 @@ vae = args.vae
 eq6_loss = args.eq6_loss
 vader_loss = args.vader_loss
 init_emo_emb = args.init_emo_emb
-# device = torch.device("cuda" if args.cuda else "cpu")
+device = torch.device("cuda" if args.cuda else "cpu")
 pointer_gen = args.pointer_gen
 is_coverage = args.is_coverage
 use_oov_emb = args.use_oov_emb

@@ -44,6 +44,18 @@ class Lang:
 
 
 def get_wordnet_pos(tag):
+    """replace word tag with word net mark
+
+    Parameters
+    ----------
+    tag : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     if tag.startswith("J"):
         return wordnet.ADJ
     elif tag.startswith("V"):
@@ -57,6 +69,19 @@ def get_wordnet_pos(tag):
 
 
 def process_sent(sentence):
+    """replace unofficial exp with official exp and 
+    tokenize sentence
+
+    Parameters
+    ----------
+    sentence : str
+        _description_
+
+    Returns
+    -------
+    sentence:str
+        _description_
+    """
     sentence = sentence.lower()
     for k, v in word_pairs.items():
         sentence = sentence.replace(k, v)
@@ -65,6 +90,7 @@ def process_sent(sentence):
 
 
 def get_commonsense(comet, item, data_dict):
+    #get common sense by different relations
     cs_list = []
     input_event = " ".join(item)
     for rel in relations:
@@ -76,11 +102,14 @@ def get_commonsense(comet, item, data_dict):
 
 
 def encode_ctx(vocab, items, data_dict, comet):
+    #ctx is turns of dialogue
     for ctx in tqdm(items):
         ctx_list = []
         e_list = []
         for i, c in enumerate(ctx):
+            #item is sentence word list
             item = process_sent(c)
+            
             ctx_list.append(item)
             vocab.index_words(item)
             ws_pos = nltk.pos_tag(item)  # pos
@@ -89,15 +118,31 @@ def encode_ctx(vocab, items, data_dict, comet):
                 if w[0] not in stop_words and (
                     w_p == wordnet.ADJ or w[0] in emotion_lexicon
                 ):
+                    #word that is not a stop word and marked as adjective or in emotion_lexicon will be added to e_list
                     e_list.append(w[0])
             if i == len(ctx) - 1:
                 get_commonsense(comet, item, data_dict)
-
+        #raw context list 
         data_dict["context"].append(ctx_list)
+        #emotion word list list
         data_dict["emotion_context"].append(e_list)
 
 
 def encode(vocab, files):
+    """encode files(list[str]) with vocab by comet model
+
+    Parameters
+    ----------
+    vocab : _type_
+        _description_
+    files : _type_
+        _description_
+
+    Returns
+    -------
+    data_dict
+        six key indicates different item
+    """
     from model.comet import Comet
 
     data_dict = {
@@ -113,6 +158,7 @@ def encode(vocab, files):
     for i, k in enumerate(data_dict.keys()):
         items = files[i]
         if k == "context":
+            # encoding context
             encode_ctx(vocab, items, data_dict, comet)
         elif k == "emotion":
             data_dict[k] = items
@@ -136,7 +182,19 @@ def encode(vocab, files):
 
 
 def read_files(vocab):
+    """load encoded dataset
+
+    Parameters
+    ----------
+    vocab : _type_
+        encoded vocabulary
+
+    Returns
+    -------
+    tuple(list,list,list)
+    """
     files = DATA_FILES(config.data_dir)
+    # list[dialog,target,emotion,situation] 4elements array
     train_files = [np.load(f, allow_pickle=True) for f in files["train"]]
     dev_files = [np.load(f, allow_pickle=True) for f in files["dev"]]
     test_files = [np.load(f, allow_pickle=True) for f in files["test"]]
@@ -149,6 +207,13 @@ def read_files(vocab):
 
 
 def load_dataset():
+    """load preprocessed dataset if exits
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     data_dir = config.data_dir
     cache_file = f"{data_dir}/dataset_preproc.p"
     if os.path.exists(cache_file):
@@ -179,6 +244,7 @@ def load_dataset():
         print("[emotion]:", data_tra["emotion"][i])
         print("[context]:", [" ".join(u) for u in data_tra["context"][i]])
         print("[target]:", " ".join(data_tra["target"][i]))
+        print("[emotion_context]:,"," ".join(data_tra["emotion_context"][i]))
         print(" ")
     return data_tra, data_val, data_tst, vocab
 
@@ -297,10 +363,22 @@ class Dataset(data.Dataset):
 
 def collate_fn(data):
     def merge(sequences):
+        """pad sequences with 1 to max len
+
+        Parameters
+        ----------
+        sequences : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
         lengths = [len(seq) for seq in sequences]
         padded_seqs = torch.ones(
             len(sequences), max(lengths)
-        ).long()  ## padding index 1
+        ).long()  ## padding to max_sentence with 1
         for i, seq in enumerate(sequences):
             end = lengths[i]
             padded_seqs[i, :end] = seq[:end]
@@ -389,5 +467,6 @@ def prepare_data_seq(batch_size=32):
 
 if __name__ == '__main__':
     train_loader,val_loader,test_loader,vocab,emotion_len=prepare_data_seq(16)
+    sample_batch=next(iter(train_loader))
     print('hello')
     

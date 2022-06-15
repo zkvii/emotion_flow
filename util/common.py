@@ -71,3 +71,13 @@ def embedding_similarity(
         sqr_mtx = sqr_mtx.sum(dim=-1)
 
     return sqr_mtx
+
+def print_opts(opts):
+    """Prints the values of all command-line arguments."""
+    print("=" * 80)
+    print("Opts".center(80))
+    print("-" * 80)
+    for key in opts.__dict__:
+        if opts.__dict__[key]:
+            print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
+    print("=" * 80)
