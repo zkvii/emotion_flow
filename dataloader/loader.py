@@ -15,8 +15,9 @@ from util.constants import EMO_MAP as emo_map
 from util.constants import DATA_FILES
 from util import config
 from util.common import save_config
+import os
 
-
+os.environ['CUDA_VISIBLE_DEVICES']='8'
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
 emotion_lexicon = json.load(open("data/NRCDict.json"))[0]
 stop_words = stopwords.words("english")

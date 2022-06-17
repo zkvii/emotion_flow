@@ -167,4 +167,5 @@ vectors
 *.ipynb
 *.sh
 *.csv
+save
 /data/glove/**
