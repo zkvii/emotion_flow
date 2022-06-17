@@ -17,7 +17,6 @@ from util import config
 from util.common import save_config
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES']='8'
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
 emotion_lexicon = json.load(open("data/NRCDict.json"))[0]
 stop_words = stopwords.words("english")
