@@ -350,7 +350,7 @@ class CEM(LightningModule):
         self.is_eval = is_eval
         self.rels = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
 
-        self.save_hyperparameters(ignore=[])
+        self.save_hyperparameters(ignore=['vocab'])
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
 
         self.encoder = self.make_encoder(config.emb_dim)

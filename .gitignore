@@ -169,3 +169,5 @@ vectors
 *.csv
 save
 /data/glove/**
+/lightning_logs/
+lightning_logs/
