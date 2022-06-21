@@ -219,7 +219,7 @@ class Decoder(nn.Module):
     def forward(self, inputs, encoder_output, mask):
         src_mask, mask_trg = mask
         dec_mask = torch.gt(
-            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)], 0
+            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].to(mask_trg.device), 0
         )
         # Add input dropout
         x = self.input_dropout(inputs)
@@ -460,7 +460,7 @@ class CEM(LightningModule):
         weight = a * RF + 1
         weight = weight / weight.sum() * len(weight)
 
-        return torch.FloatTensor(weight).to(config.device)
+        return torch.FloatTensor(weight)
 
     def forward(self, batch):
         ## Encode the context (Semantic Knowledge)
@@ -475,7 +475,7 @@ class CEM(LightningModule):
         cs_masks = []
         cs_outputs = []
         for r in self.rels:
-            emb = self.embedding(batch[r]).to(config.device)
+            emb = self.embedding(batch[r])
             mask = batch[r].data.eq(config.PAD_idx).unsqueeze(1)
             cs_embs.append(emb)
             cs_masks.append(mask)
@@ -544,8 +544,8 @@ class CEM(LightningModule):
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
-            .to(config.device)
-        )
+            
+        ).to(dec_batch.device)
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), dim=1)
         mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
 
@@ -562,8 +562,8 @@ class CEM(LightningModule):
             attn_dist_db=None,
         )
 
-        emo_label = torch.LongTensor(batch["program_label"]).to(config.device)
-        emo_loss = nn.CrossEntropyLoss()(emo_logits, emo_label).to(config.device)
+        emo_label = torch.LongTensor(batch["program_label"]).to(emo_logits.device)
+        emo_loss = nn.CrossEntropyLoss()(emo_logits, emo_label)
         ctx_loss = self.criterion_ppl(
             logit.contiguous().view(-1, logit.size(-1)),
             dec_batch.contiguous().view(-1),
@@ -573,7 +573,7 @@ class CEM(LightningModule):
             _, preds = logit.max(dim=-1)
             preds = self.clean_preds(preds)
             self.update_frequency(preds)
-            self.criterion.weight = self.calc_weight()
+            self.criterion.weight = self.calc_weight().to(logit.device)
             not_pad = dec_batch.ne(config.PAD_idx)
             target_tokens = not_pad.long().sum().item()
             div_loss = self.criterion(
@@ -599,12 +599,13 @@ class CEM(LightningModule):
                 txt = [[" ".join(t) for t in tm] for tm in batch[f"{r}_txt"]][0]
                 comet_res[r] = txt
 
-        if train:
-            loss.backward()
-            self.optimizer.step()
+        # if train:
+            # loss.backward()
+            # self.optimizer.step()
 
         return (
-            ctx_loss.item(),
+            # ctx_loss.item(),
+            ctx_loss,
             math.exp(min(ctx_loss.item(), 100)),
             emo_loss.item(),
             program_acc,
@@ -641,7 +642,7 @@ class CEM(LightningModule):
         ) = get_input_from_batch(batch)
         src_mask, ctx_output, _ = self.forward(batch)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -672,9 +673,9 @@ class CEM(LightningModule):
             next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -701,7 +702,7 @@ class CEM(LightningModule):
         ) = get_input_from_batch(batch)
         src_mask, ctx_output, _ = self.forward(batch)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -738,9 +739,9 @@ class CEM(LightningModule):
             next_word = next_word.item()
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
