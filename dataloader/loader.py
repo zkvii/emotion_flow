@@ -215,7 +215,9 @@ def load_dataset():
         _description_
     """
     data_dir = config.data_dir
-    cache_file = f"{data_dir}/dataset_preproc.p"
+    # cache_file = f"{data_dir}/dataset_preproc.p"
+    cache_file = f"{data_dir}/dataset_preproc_order.p"
+
     if os.path.exists(cache_file):
         print("LOADING empathetic_dialogue")
         with open(cache_file, "rb") as f:
