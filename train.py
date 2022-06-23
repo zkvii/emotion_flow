@@ -11,7 +11,8 @@ from torch.nn.init import xavier_normal_
 import torch.nn as nn
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
-    
+import os
+os.environ['CUDA_VISIBLE_DEVICES']='0,1'
 
 
 def main():
