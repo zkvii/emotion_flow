@@ -11,15 +11,16 @@ from torch.nn.init import xavier_normal_
 import torch.nn as nn
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
+    
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0,1'
+# os.environ['CUDA_VISIBLE_DEVICES']='0,1'
 
 
 def main():
     """main func
     """
     # decoder_num is eq2 emo_num
-    train_set, dev_set, test_set, vocab, decoder_num = prepare_data_seq(
+    train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
         batch_size=config.batch_size
     )
 
@@ -35,16 +36,15 @@ def main():
         if p.dim() > 1 and (n != "embedding.lut.weight" and config.pretrain_emb):
             xavier_normal_(p)
     
-    dataloader=DataLoader(dataset=train_set,batch_size=config.batch_size,shuffle=True)
     checkpoint_callback = ModelCheckpoint(
         monitor="val_ppl", filename=f"{config.model}", mode="min")
     trainer=Trainer(
         max_epochs=12,
         accelerator='gpu',
         callbacks=[checkpoint_callback],
-        progress_bar_refresh_rate=100
+        # progress_bar_refresh_rate=10
         )
-    trainer.fit(model=model,train_dataloaders=dataloader)
+    trainer.fit(model=model,train_dataloaders=train_loader)
 if __name__ == '__main__':
     main()
     

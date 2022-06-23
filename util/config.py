@@ -32,7 +32,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--save_path", type=str, default="save/test")
 parser.add_argument("--model_path", type=str, default="save/test")
 parser.add_argument("--save_path_dataset", type=str, default="save/")
-parser.add_argument("--cuda", default=False, action="store_true")
+parser.add_argument("--cuda", default=True, action="store_true")
 
 parser.add_argument("--pointer_gen", action="store_true")
 parser.add_argument("--oracle", action="store_true")

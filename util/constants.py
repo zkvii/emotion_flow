@@ -46,7 +46,7 @@ WORD_PAIRS = {
     "there're": "there are",
 }
 
-EMO_MAP = {
+EMO_MAP_OLD = {
     "surprised": 0,
     "excited": 1,
     "annoyed": 2,
@@ -81,7 +81,7 @@ EMO_MAP = {
     "faithful": 31,
 }
 
-MAP_EMO = {
+MAP_EMO_OLD = {
     0: "surprised",
     1: "excited",
     2: "annoyed",
@@ -115,3 +115,102 @@ MAP_EMO = {
     30: "apprehensive",
     31: "faithful",
 }
+
+EMO_MAP_UNORDERED={
+
+    'angry':0,
+    'annoyed':0,
+    'jealous':0,
+    'furious':0,
+
+    'afraid':1,
+    'terrified':1,
+    'anxious':1,
+    'apprehensive':1,
+
+    'sad':2,
+    'disappointed':2,
+    'devastated':2,
+    'loney':2,
+    'nostalgic':2,
+    'sentimental':2,
+      
+    'disgusted':3,
+    'embarrassed':3,
+    'guilty':3,
+    'ashamed':3,
+    
+    'faithful':4,
+    'trusting':4,
+    'grateful':4,
+    'caring':4,
+    'hopeful':4,
+    
+    'anticipating':5,
+    'prepared':5,
+    'confident':5,
+        
+    'proud':6,
+    'impressed':6,
+    'content':6,
+    
+    'exicited':7,
+    'surprised':7,
+    'joyful':7,
+    
+}
+
+MAP_EMO_UNORDERED={
+    0:'angry',
+    1:'afraid',
+    2:'sad',
+    3:'disgusted',
+    4:'faithful',
+    5:'anticipating',
+    6:'proud',
+    7:'exited',
+}
+
+EMO_MAP={
+    'angry':0,
+    'annoyed':1,
+    'jealous':2,
+    'furious':3,
+
+    'afraid':4,
+    'terrified':5,
+    'anxious':6,
+    'apprehensive':7,
+
+    'sad':8,
+    'disappointed':9,
+    'devastated':10,
+    'loney':11,
+    'nostalgic':12,
+    'sentimental':13,
+      
+    'disgusted':14,
+    'embarrassed':15,
+    'guilty':16,
+    'ashamed':17,
+    
+    'faithful':18,
+    'trusting':19,
+    'grateful':20,
+    'caring':21,
+    'hopeful':22,
+    
+    'anticipating':23,
+    'prepared':24,
+    'confident':25,
+        
+    'proud':26,
+    'impressed':27,
+    'content':28,
+    
+    'exicited':29,
+    'surprised':30,
+    'joyful':31,
+}
+
+MAP_EMO={EMO_MAP[k]:k for k in EMO_MAP}

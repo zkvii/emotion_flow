@@ -215,7 +215,9 @@ def load_dataset():
         _description_
     """
     data_dir = config.data_dir
-    cache_file = f"{data_dir}/dataset_preproc.p"
+    # cache_file = f"{data_dir}/dataset_preproc.p"
+    cache_file = f"{data_dir}/dataset_preproc_order.p"
+
     if os.path.exists(cache_file):
         print("LOADING empathetic_dialogue")
         with open(cache_file, "rb") as f:
@@ -397,9 +399,9 @@ def collate_fn(data):
     ## Target
     target_batch, target_lengths = merge(item_info["target"])
 
-    input_batch = input_batch.to(config.device)
-    mask_input = mask_input.to(config.device)
-    target_batch = target_batch.to(config.device)
+    input_batch = input_batch
+    mask_input = mask_input
+    target_batch = target_batch
 
     d = {}
     d["input_batch"] = input_batch
@@ -407,7 +409,7 @@ def collate_fn(data):
     d["mask_input"] = mask_input
     d["target_batch"] = target_batch
     d["target_lengths"] = torch.LongTensor(target_lengths)
-    d["emotion_context_batch"] = emotion_batch.to(config.device)
+    d["emotion_context_batch"] = emotion_batch
 
     ##program
     d["target_program"] = item_info["emotion"]
@@ -424,7 +426,7 @@ def collate_fn(data):
     relations = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
     for r in relations:
         pad_batch, _ = merge(item_info[r])
-        pad_batch = pad_batch.to(config.device)
+        pad_batch = pad_batch
         d[r] = pad_batch
         d[f"{r}_txt"] = item_info[f"{r}_txt"]
 

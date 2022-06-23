@@ -459,7 +459,7 @@ class CEM(nn.Module):
         weight = a * RF + 1
         weight = weight / weight.sum() * len(weight)
 
-        return torch.FloatTensor(weight).to(config.device)
+        return torch.FloatTensor(weight)
 
     def forward(self, batch):
         ## Encode the context (Semantic Knowledge)
@@ -474,7 +474,7 @@ class CEM(nn.Module):
         cs_masks = []
         cs_outputs = []
         for r in self.rels:
-            emb = self.embedding(batch[r]).to(config.device)
+            emb = self.embedding(batch[r])
             mask = batch[r].data.eq(config.PAD_idx).unsqueeze(1)
             cs_embs.append(emb)
             cs_masks.append(mask)
@@ -543,7 +543,7 @@ class CEM(nn.Module):
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
-            .to(config.device)
+            
         )
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), dim=1)
         mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
@@ -561,8 +561,8 @@ class CEM(nn.Module):
             attn_dist_db=None,
         )
 
-        emo_label = torch.LongTensor(batch["program_label"]).to(config.device)
-        emo_loss = nn.CrossEntropyLoss()(emo_logits, emo_label).to(config.device)
+        emo_label = torch.LongTensor(batch["program_label"])
+        emo_loss = nn.CrossEntropyLoss()(emo_logits, emo_label)
         ctx_loss = self.criterion_ppl(
             logit.contiguous().view(-1, logit.size(-1)),
             dec_batch.contiguous().view(-1),
@@ -632,7 +632,7 @@ class CEM(nn.Module):
         ) = get_input_from_batch(batch)
         src_mask, ctx_output, _ = self.forward(batch)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -663,9 +663,9 @@ class CEM(nn.Module):
             next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -692,7 +692,7 @@ class CEM(nn.Module):
         ) = get_input_from_batch(batch)
         src_mask, ctx_output, _ = self.forward(batch)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -729,9 +729,9 @@ class CEM(nn.Module):
             next_word = next_word.item()
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
