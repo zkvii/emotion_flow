@@ -24,7 +24,7 @@ parser.add_argument("--init_emo_emb", action="store_true")
 
 parser.add_argument("--hidden_dim", type=int, default=300)
 parser.add_argument("--emb_dim", type=int, default=300)
-parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--lr", type=float, default=0.0001)
 parser.add_argument("--max_grad_norm", type=float, default=2.0)
 parser.add_argument("--beam_size", type=int, default=5)

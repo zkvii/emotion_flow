@@ -631,6 +631,15 @@ class CEM(LightningModule):
         self.log('train_bce',bce)
         self.log('train_acc',acc)
         return loss
+
+    def validation_step(self,batch,batch_idx):
+        loss, ppl, bce, acc, _, _ = self.train_one_batch(batch,batch_idx)
+        self.log('valid_ppl',ppl)
+        self.log('valid_loss',loss)
+        self.log('valid_bce',bce)
+        self.log('valid_acc',acc)
+        return loss
+        
     
     def compute_act_loss(self, module):
         R_t = module.remainders

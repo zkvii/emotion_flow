@@ -131,7 +131,7 @@ EMO_MAP_T={
     'sad':2,
     'disappointed':2,
     'devastated':2,
-    'loney':2,
+    'lonely':2,
     'nostalgic':2,
     'sentimental':2,
       
@@ -154,7 +154,7 @@ EMO_MAP_T={
     'impressed':6,
     'content':6,
     
-    'exicited':7,
+    'excited':7,
     'surprised':7,
     'joyful':7,
     

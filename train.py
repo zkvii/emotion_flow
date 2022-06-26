@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
     
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1'
+os.environ['CUDA_VISIBLE_DEVICES']='0,1,2,4,5,8,9'
 
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
@@ -35,7 +35,7 @@ def main():
         decoder_number=decoder_num,
         is_eval=config.test,
         model_file_path=config.model_path if config.test else None
-    ).to('cuda')
+    )
 
     # Intialization
     for n, p in model.named_parameters():
@@ -43,14 +43,15 @@ def main():
             xavier_normal_(p)
     
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_ppl", filename=f"{config.model}", mode="min")
+        monitor="valid_ppl", filename=f"{config.model}", mode="min")
     trainer=Trainer(
         max_epochs=12,
         accelerator='gpu',
         callbacks=[checkpoint_callback],
         # progress_bar_refresh_rate=10
         )
-    trainer.fit(model=model,train_dataloaders=train_loader)
+    trainer.fit(model=model,train_dataloaders=train_loader,val_dataloaders=dev_loader)
 if __name__ == '__main__':
-    prepare_data_seq()
+    # prepare_data_seq()
+    main()
     
