@@ -1,5 +1,7 @@
 ### TAKEN FROM https://github.com/kolloldas/torchnlp
+import imp
 import os
+from re import I
 import torch
 import torch.nn as nn
 from collections import Counter
@@ -22,7 +24,9 @@ from model.common import (
 )
 from util import config
 from util.constants import MAP_EMO
-
+from util.constants import MAP_EMO_T
+from util.constants import MAP_EMO_ORIGIN
+from util.constants import MAP_EMO_RANDOM
 from sklearn.metrics import accuracy_score
 
 
@@ -594,7 +598,14 @@ class CEM(LightningModule):
 
         if self.is_eval:
             top_preds = emo_logits.detach().cpu().numpy().argsort()[0][-3:][::-1]
-            top_preds = f"{', '.join([MAP_EMO[pred.item()] for pred in top_preds])}"
+            if config.emotion_emb_type == 'order':
+                top_preds = f"{', '.join([MAP_EMO[pred.item()] for pred in top_preds])}"
+            elif config.emotion_emb_type == 'tolerance':
+                top_preds = f"{', '.join([MAP_EMO_T[pred.item()] for pred in top_preds])}"
+            elif config.emotion_emb_type == 'origin':
+                top_preds = f"{', '.join([MAP_EMO_ORIGIN[pred.item()] for pred in top_preds])}"
+            else:
+                top_preds = f"{', '.join([MAP_EMO_RANDOM[pred.item()] for pred in top_preds])}"
             for r in self.rels:
                 txt = [[" ".join(t) for t in tm] for tm in batch[f"{r}_txt"]][0]
                 comet_res[r] = txt

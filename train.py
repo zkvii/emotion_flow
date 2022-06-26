@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
     
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='4'
+os.environ['CUDA_VISIBLE_DEVICES']='1'
 
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
@@ -52,5 +52,5 @@ def main():
         )
     trainer.fit(model=model,train_dataloaders=train_loader)
 if __name__ == '__main__':
-    preprocess()
+    prepare_data_seq()
     

@@ -63,6 +63,8 @@ parser.add_argument("--act", action="store_true")
 parser.add_argument("--act_loss_weight", type=float, default=0.001)
 
 parser.add_argument("--emb_file", type=str)
+# parser.add_argument("--ds_name", type=str,default='ds_pre')
+parser.add_argument("--emotion_emb_type", type=str,default='order',help='condidates:order|origin|tolerance|random')
 
 ## transformer
 parser.add_argument("--hop", type=int, default=1)
@@ -145,6 +147,9 @@ woDiv = args.woDiv
 
 seed = args.seed
 
+#preprocess
+# ds_name=args.ds_name
+emotion_emb_type=args.emotion_emb_type
 if test:
     pretrain_emb = False
 

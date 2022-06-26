@@ -46,7 +46,7 @@ WORD_PAIRS = {
     "there're": "there are",
 }
 
-EMO_MAP_OLD = {
+EMO_MAP_ORIGIN = {
     "surprised": 0,
     "excited": 1,
     "annoyed": 2,
@@ -81,7 +81,7 @@ EMO_MAP_OLD = {
     "faithful": 31,
 }
 
-MAP_EMO_OLD = {
+MAP_EMO_ORIGIN = {
     0: "surprised",
     1: "excited",
     2: "annoyed",
@@ -116,7 +116,7 @@ MAP_EMO_OLD = {
     31: "faithful",
 }
 
-EMO_MAP_UNORDERED={
+EMO_MAP_T={
 
     'angry':0,
     'annoyed':0,
@@ -160,7 +160,7 @@ EMO_MAP_UNORDERED={
     
 }
 
-MAP_EMO_UNORDERED={
+MAP_EMO_T={
     0:'angry',
     1:'afraid',
     2:'sad',
@@ -185,7 +185,7 @@ EMO_MAP={
     'sad':8,
     'disappointed':9,
     'devastated':10,
-    'loney':11,
+    'lonely':11,
     'nostalgic':12,
     'sentimental':13,
       
@@ -208,9 +208,11 @@ EMO_MAP={
     'impressed':27,
     'content':28,
     
-    'exicited':29,
+    'excited':29,
     'surprised':30,
     'joyful':31,
 }
 
 MAP_EMO={EMO_MAP[k]:k for k in EMO_MAP}
+EMO_MAP_RANDOM={}
+MAP_EMO_RANDOM={}

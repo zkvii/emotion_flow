@@ -12,6 +12,9 @@ from nltk.corpus import wordnet, stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from util.constants import WORD_PAIRS as word_pairs
 from util.constants import EMO_MAP as emo_map
+from util.constants import EMO_MAP_T as emo_map_t
+from util.constants import EMO_MAP_ORIGIN as emo_map_o
+from util.constants import EMO_MAP_RANDOM as emo_map_r
 from util.constants import DATA_FILES
 from util import config
 from util.common import save_config
@@ -103,6 +106,7 @@ def get_commonsense(comet, item, data_dict):
 
 def encode_ctx(vocab, items, data_dict, comet):
     #ctx is turns of dialogue
+    print(f'start context encoding')
     for ctx in tqdm(items):
         ctx_list = []
         e_list = []
@@ -216,7 +220,7 @@ def load_dataset():
     """
     data_dir = config.data_dir
     # cache_file = f"{data_dir}/dataset_preproc.p"
-    cache_file = f"{data_dir}/dataset_preproc_order.p"
+    cache_file = f"{data_dir}/ds_{config.emotion_emb_type}.p"
 
     if os.path.exists(cache_file):
         print("LOADING empathetic_dialogue")
@@ -258,7 +262,14 @@ class Dataset(data.Dataset):
         """Reads source and target sequences from txt files."""
         self.vocab = vocab
         self.data = data
-        self.emo_map = emo_map
+        if config.emotion_emb_type == 'order':
+            self.emo_map = emo_map
+        elif config.emotion_emb_type == 'tolerance':
+            self.emo_map = emo_map_t
+        elif config.emotion_emb_type == 'origin':
+            self.emo_map = emo_map_o
+        else :
+            self.emo_map = emo_map_r
         self.analyzer = SentimentIntensityAnalyzer()
 
     def __len__(self):
@@ -458,7 +469,7 @@ def prepare_data_seq(batch_size=32):
     data_loader_tst = torch.utils.data.DataLoader(
         dataset=dataset_test, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
-    save_config()
+    # save_config()
     return (
         data_loader_tra,
         data_loader_val,
