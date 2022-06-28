@@ -332,7 +332,7 @@ class MulDecoder(nn.Module):
     def forward(self, inputs, encoder_output, mask, attention_epxert):
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
-            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)], 0
+            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].to(mask_trg.device), 0
         )
         # Add input dropout
         x = self.input_dropout(inputs)

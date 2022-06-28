@@ -593,19 +593,19 @@ class CEM(LightningModule):
         top_preds = ""
         comet_res = {}
 
-        if self.is_eval:
-            top_preds = emo_logits.detach().cpu().numpy().argsort()[0][-3:][::-1]
-            if config.emotion_emb_type == 'order':
-                top_preds = f"{', '.join([MAP_EMO[pred.item()] for pred in top_preds])}"
-            elif config.emotion_emb_type == 'tolerance':
-                top_preds = f"{', '.join([MAP_EMO_T[pred.item()] for pred in top_preds])}"
-            elif config.emotion_emb_type == 'origin':
-                top_preds = f"{', '.join([MAP_EMO_ORIGIN[pred.item()] for pred in top_preds])}"
-            else:
-                top_preds = f"{', '.join([MAP_EMO_RANDOM[pred.item()] for pred in top_preds])}"
-            for r in self.rels:
-                txt = [[" ".join(t) for t in tm] for tm in batch[f"{r}_txt"]][0]
-                comet_res[r] = txt
+        # if self.is_eval:
+        #     top_preds = emo_logits.detach().cpu().numpy().argsort()[0][-3:][::-1]
+        #     if config.emotion_emb_type == 'order':
+        #         top_preds = f"{', '.join([MAP_EMO[pred.item()] for pred in top_preds])}"
+        #     elif config.emotion_emb_type == 'tolerance':
+        #         top_preds = f"{', '.join([MAP_EMO_T[pred.item()] for pred in top_preds])}"
+        #     elif config.emotion_emb_type == 'origin':
+        #         top_preds = f"{', '.join([MAP_EMO_ORIGIN[pred.item()] for pred in top_preds])}"
+        #     else:
+        #         top_preds = f"{', '.join([MAP_EMO_RANDOM[pred.item()] for pred in top_preds])}"
+        #     for r in self.rels:
+        #         txt = [[" ".join(t) for t in tm] for tm in batch[f"{r}_txt"]][0]
+        #         comet_res[r] = txt
 
         # if train:
             # loss.backward()
