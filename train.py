@@ -7,6 +7,7 @@ from dataloader.loader import prepare_data_seq
 from model.empdg import EMPDG
 from model.moel import MOEL
 from model.trans import Transformer
+from model.MIME.model import MIME
 # from model.moel import MOEL
 # from model.trans import Transformer
 
@@ -52,6 +53,17 @@ def main():
         )
     elif config.model=='trans':
         model = Transformer(
+            vocab,
+            decoder_number=decoder_num,
+        )
+    elif config.model=='mult':
+            model = Transformer(
+            vocab,
+            is_multitask=True,
+            decoder_number=decoder_num,
+        )
+    elif config.model =='mime':
+            model = MIME(
             vocab,
             decoder_number=decoder_num,
         )
