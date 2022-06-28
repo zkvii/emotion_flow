@@ -18,7 +18,7 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
     
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES']=config.devices
 
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
