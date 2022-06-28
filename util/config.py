@@ -71,6 +71,7 @@ parser.add_argument("--hop", type=int, default=1)
 parser.add_argument("--heads", type=int, default=2)
 parser.add_argument("--depth", type=int, default=40)
 parser.add_argument("--filter", type=int, default=50)
+parser.add_argument("--devices", type=str, default='0')
 
 
 
@@ -146,7 +147,7 @@ woCOG = args.woCOG
 woDiv = args.woDiv
 
 seed = args.seed
-
+devices = args.devices
 #preprocess
 # ds_name=args.ds_name
 emotion_emb_type=args.emotion_emb_type

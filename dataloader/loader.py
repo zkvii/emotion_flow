@@ -456,7 +456,6 @@ def prepare_data_seq(batch_size=32):
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_fn,
-        num_workers=8
     )
 
     dataset_valid = Dataset(pairs_val, vocab)
@@ -464,12 +463,10 @@ def prepare_data_seq(batch_size=32):
         dataset=dataset_valid,
         batch_size=batch_size,
         collate_fn=collate_fn,
-        num_workers=8
     )
     dataset_test = Dataset(pairs_tst, vocab)
     data_loader_tst = torch.utils.data.DataLoader(
         dataset=dataset_test, batch_size=1, shuffle=False, collate_fn=collate_fn,
-        num_workers=8
     )
     # save_config()
     return (
