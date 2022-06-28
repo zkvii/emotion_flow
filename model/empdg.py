@@ -329,9 +329,9 @@ class Decoder(nn.Module):
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
             mask_trg.bool()
-            + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].bool(),
+            + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].bool().to(mask_trg.device),
             0,
-        ).to(config.device)
+        )
         # Add input dropout
         x = self.input_dropout(inputs)
         x = self.embedding_proj(x)
@@ -432,7 +432,7 @@ class EMPDG(LightningModule):
         self,
         vocab,
         decoder_number,
-        config=config
+        hp=config.args
     ):
         """
         :param decoder_number: the number of emotion labels, i.e., 32
@@ -529,14 +529,14 @@ class EMPDG(LightningModule):
             )
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
-        if config.noam:
-            self.optimizer = NoamOpt(
-                config.hidden_dim,
-                1,
-                8000,
-                torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
-            )
+        # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
+        # if config.noam:
+        #     self.optimizer = NoamOpt(
+        #         config.hidden_dim,
+        #         1,
+        #         8000,
+        #         torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+        #     )
 
         # if model_file_path is not None:
         #     print("loading weights")
@@ -545,10 +545,10 @@ class EMPDG(LightningModule):
         #     self.load_state_dict({name: weights_best[name] for name in weights_best})
         #     self.eval()
 
-        self.model_dir = config.save_path
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
-        self.best_path = ""
+        # self.model_dir = config.save_path
+        # if not os.path.exists(self.model_dir):
+        #     os.makedirs(self.model_dir)
+        # self.best_path = ""
 
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
@@ -641,7 +641,7 @@ class EMPDG(LightningModule):
             loss_ppl = self.criterion_ppl(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
-            ).item()
+            )
 
 
         if config.label_smoothing:
@@ -652,7 +652,7 @@ class EMPDG(LightningModule):
                 emotion_acc,
             )
         else:
-            return loss.item(), math.exp(min(loss.item(), 100)), 0, 0
+            return loss, math.exp(min(loss.item(), 100)), 0, 0
 
     def compute_act_loss(self, module):
         R_t = module.remainders
@@ -675,10 +675,10 @@ class EMPDG(LightningModule):
         ) = get_input_from_batch(batch)
         enc_emo_batch = batch["emotion_context_batch"]
 
-        if config.noam:
-            self.optimizer.optimizer.zero_grad()
-        else:
-            self.optimizer.zero_grad()
+        # if config.noam:
+        #     self.optimizer.optimizer.zero_grad()
+        # else:
+        #     self.optimizer.zero_grad()
 
         ## Semantic Understanding
         mask_semantic = enc_batch.data.eq(config.PAD_idx).unsqueeze(

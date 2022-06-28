@@ -430,7 +430,7 @@ class MOEL(LightningModule):
         self,
         vocab,
         decoder_number,
-        config=config
+        hp=config.args
     ):
         super(MOEL, self).__init__()
         self.vocab = vocab
@@ -482,14 +482,14 @@ class MOEL(LightningModule):
         else:
             self.attention_activation = nn.Sigmoid()  # nn.Softmax()
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
-        if config.noam:
-            self.optimizer = NoamOpt(
-                config.hidden_dim,
-                1,
-                8000,
-                torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
-            )
+        # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
+        # if config.noam:
+        #     self.optimizer = NoamOpt(
+        #         config.hidden_dim,
+        #         1,
+        #         8000,
+        #         torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+        #     )
 
         # if model_file_path is not None:
         #     print("loading weights")
@@ -499,10 +499,10 @@ class MOEL(LightningModule):
         #         self.optimizer.load_state_dict(state["optimizer"])
         #     self.eval()
 
-        self.model_dir = config.save_path
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
-        self.best_path = ""
+        # self.model_dir = config.save_path
+        # if not os.path.exists(self.model_dir):
+        #     os.makedirs(self.model_dir)
+        # self.best_path = ""
 
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
@@ -546,10 +546,10 @@ class MOEL(LightningModule):
         ) = get_input_from_batch(batch)
         dec_batch, _, _, _, _ = get_output_from_batch(batch)
 
-        if config.noam:
-            self.optimizer.optimizer.zero_grad()
-        else:
-            self.optimizer.zero_grad()
+        # if config.noam:
+        #     self.optimizer.optimizer.zero_grad()
+        # else:
+        #     self.optimizer.zero_grad()
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
         emb_mask = self.embedding(batch["mask_input"])
@@ -628,7 +628,7 @@ class MOEL(LightningModule):
             )
             loss_bce_program = nn.CrossEntropyLoss()(
                 logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
-            ).item()
+            )
         else:
             loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
@@ -638,7 +638,7 @@ class MOEL(LightningModule):
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
                 logit_prob, torch.FloatTensor(batch["target_program"]).to(config.device)
-            ).item()
+            )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
 
@@ -646,7 +646,7 @@ class MOEL(LightningModule):
             loss_ppl = self.criterion_ppl(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
-            ).item()
+            )
 
         # if train:
         #     loss.backward()
@@ -656,7 +656,7 @@ class MOEL(LightningModule):
             return loss_ppl, math.exp(min(loss_ppl, 100)), loss_bce_program, program_acc
         else:
             return (
-                loss.item(),
+                loss,
                 math.exp(min(loss.item(), 100)),
                 loss_bce_program,
                 program_acc,

@@ -224,7 +224,7 @@ class Decoder(nn.Module):
     def forward(self, inputs, encoder_output, mask):
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
-            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)], 0
+            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].to(mask_trg.device), 0
         )
         # Add input dropout
         x = self.input_dropout(inputs)
@@ -320,14 +320,15 @@ class Transformer(LightningModule):
         self,
         vocab,
         decoder_number,
-        config=config,
+        hp=config.args,
         is_multitask=False,
     ):
         super(Transformer, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
         self.multitask = is_multitask
-
+        self.save_hyperparameters(ignore=['vocab'])
+        
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
         self.encoder = Encoder(
             config.emb_dim,
@@ -365,14 +366,14 @@ class Transformer(LightningModule):
             )
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
-        if config.noam:
-            self.optimizer = NoamOpt(
-                config.hidden_dim,
-                1,
-                8000,
-                torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
-            )
+        # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
+        # if config.noam:
+        #     self.optimizer = NoamOpt(
+        #         config.hidden_dim,
+        #         1,
+        #         8000,
+        #         torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+        #     )
 
         # if model_file_path is not None:
         #     print("loading weights")
@@ -382,10 +383,10 @@ class Transformer(LightningModule):
         #         self.optimizer.load_state_dict(state["optimizer"])
         #     self.eval()
 
-        self.model_dir = config.save_path
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
-        self.best_path = ""
+        # self.model_dir = config.save_path
+        # if not os.path.exists(self.model_dir):
+        #     os.makedirs(self.model_dir)
+        # self.best_path = ""
 
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
@@ -416,10 +417,10 @@ class Transformer(LightningModule):
         ) = get_input_from_batch(batch)
         dec_batch, _, _, _, _ = get_output_from_batch(batch)
 
-        if config.noam:
-            self.optimizer.optimizer.zero_grad()
-        else:
-            self.optimizer.zero_grad()
+        # if config.noam:
+        #     self.optimizer.optimizer.zero_grad()
+        # else:
+        #     self.optimizer.zero_grad()
 
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
@@ -465,7 +466,7 @@ class Transformer(LightningModule):
             )
             loss_bce_program = nn.CrossEntropyLoss()(
                 logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
-            ).item()
+            )
             pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
             program_acc = accuracy_score(batch["program_label"], pred_program)
 
@@ -473,7 +474,7 @@ class Transformer(LightningModule):
             loss_ppl = self.criterion_ppl(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
-            ).item()
+            )
 
   
         if self.multitask:
@@ -486,7 +487,7 @@ class Transformer(LightningModule):
                 )
             else:
                 return (
-                    loss.item(),
+                    loss,
                     math.exp(min(loss.item(), 100)),
                     loss_bce_program,
                     program_acc,
@@ -495,7 +496,7 @@ class Transformer(LightningModule):
             if config.label_smoothing:
                 return loss_ppl, math.exp(min(loss_ppl, 100)), 0, 0
             else:
-                return loss.item(), math.exp(min(loss.item(), 100)), 0, 0
+                return loss, math.exp(min(loss.item(), 100)), 0, 0
 
     def compute_act_loss(self, module):
         R_t = module.remainders

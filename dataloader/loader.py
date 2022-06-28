@@ -463,7 +463,6 @@ def prepare_data_seq(batch_size=32):
     data_loader_val = torch.utils.data.DataLoader(
         dataset=dataset_valid,
         batch_size=batch_size,
-        shuffle=True,
         collate_fn=collate_fn,
         num_workers=8
     )

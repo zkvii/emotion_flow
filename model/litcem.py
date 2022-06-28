@@ -341,7 +341,7 @@ class CEM(LightningModule):
         self,
         vocab,
         decoder_number,
-        config=config
+        hp=config.args
     ):  
         super(CEM, self).__init__()
         self.vocab = vocab
