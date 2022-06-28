@@ -4,6 +4,11 @@ from pytorch_lightning import Trainer
 from tqdm import tqdm
 from dataloader.loader import prepare_data_seq
 from torch.utils.data import DataLoader
+from model.empdg import EMPDG
+from model.moel import MOEL
+from model.trans import Transformer
+# from model.moel import MOEL
+# from model.trans import Transformer
 
 from util import config
 from model.litcem import CEM
@@ -30,12 +35,27 @@ def main():
         batch_size=config.batch_size
     )
 
-    model = CEM(
-        vocab,
-        decoder_number=decoder_num,
-        is_eval=config.test,
-        model_file_path=config.model_path if config.test else None
-    )
+    if config.model == 'cem':
+        model = CEM(
+            vocab,
+            decoder_number=decoder_num,
+        )
+    elif config.model=='empdg':
+        model = EMPDG(
+            vocab,
+            decoder_number=decoder_num,
+        )
+    elif config.model=='moel':
+        model = MOEL(
+            vocab,
+            decoder_number=decoder_num,
+        )
+    elif config.model=='trans':
+        model = Transformer(
+            vocab,
+            decoder_number=decoder_num,
+        )
+        
 
     # Intialization
     for n, p in model.named_parameters():
@@ -43,7 +63,7 @@ def main():
             xavier_normal_(p)
     
     checkpoint_callback = ModelCheckpoint(
-        monitor="valid_ppl", filename=f"{config.model}", mode="min")
+        monitor="valid_ppl", filename=f"{config.model}-{config.emotion_emb_type}", mode="min")
     trainer=Trainer(
         max_epochs=12,
         accelerator='gpu',
@@ -52,6 +72,6 @@ def main():
         )
     trainer.fit(model=model,train_dataloaders=train_loader,val_dataloaders=dev_loader)
 if __name__ == '__main__':
-    prepare_data_seq()
-    # main()
+    # prepare_data_seq()
+    main()
     

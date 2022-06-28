@@ -341,9 +341,7 @@ class CEM(LightningModule):
         self,
         vocab,
         decoder_number,
-        model_file_path=None,
-        is_eval=False,
-        load_optim=False,
+        config=config
     ):  
         super(CEM, self).__init__()
         self.vocab = vocab
@@ -351,7 +349,6 @@ class CEM(LightningModule):
 
         self.word_freq = np.zeros(self.vocab_size)
 
-        self.is_eval = is_eval
         self.rels = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
 
         self.save_hyperparameters(ignore=['vocab'])
@@ -397,13 +394,13 @@ class CEM(LightningModule):
                 torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
             )
 
-        if model_file_path is not None:
-            print("loading weights")
-            state = torch.load(model_file_path, map_location=config.device)
-            self.load_state_dict(state["model"])
-            if load_optim:
-                self.optimizer.load_state_dict(state["optimizer"])
-            self.eval()
+        # if model_file_path is not None:
+        #     print("loading weights")
+        #     state = torch.load(model_file_path, map_location=config.device)
+        #     self.load_state_dict(state["model"])
+        #     if load_optim:
+        #         self.optimizer.load_state_dict(state["optimizer"])
+        #     self.eval()
 
         self.model_dir = config.save_path
         if not os.path.exists(self.model_dir):

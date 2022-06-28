@@ -1,8 +1,8 @@
 ### TAKEN FROM https://github.com/kolloldas/torchnlp
+
 import os
 import torch
 import torch.nn as nn
-from collections import Counter
 import torch.nn.functional as F
 
 import numpy as np
@@ -14,6 +14,7 @@ from model.common import (
     _gen_bias_mask,
     _gen_timing_signal,
     share_embedding,
+    LabelSmoothing,
     NoamOpt,
     _get_attn_subsequent_mask,
     get_input_from_batch,
@@ -21,8 +22,7 @@ from model.common import (
     top_k_top_p_filtering,
 )
 from util import config
-from util.constants import MAP_EMO
-
+from pytorch_lightning import LightningModule
 from sklearn.metrics import accuracy_score
 
 
@@ -98,6 +98,11 @@ class Encoder(nn.Module):
 
         self.layer_norm = LayerNorm(hidden_size)
         self.input_dropout = nn.Dropout(input_dropout)
+
+        if config.act:
+            self.act_fn = ACT_basic(hidden_size)
+            self.remainders = None
+            self.n_updates = None
 
     def forward(self, inputs, mask):
         # Add input dropout
@@ -217,7 +222,7 @@ class Decoder(nn.Module):
         self.input_dropout = nn.Dropout(input_dropout)
 
     def forward(self, inputs, encoder_output, mask):
-        src_mask, mask_trg = mask
+        mask_src, mask_trg = mask
         dec_mask = torch.gt(
             mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)], 0
         )
@@ -249,7 +254,7 @@ class Decoder(nn.Module):
                         .type_as(inputs.data)
                     )
                     x, _, attn_dist, _ = self.dec(
-                        (x, encoder_output, [], (src_mask, dec_mask))
+                        (x, encoder_output, [], (mask_src, dec_mask))
                     )
                 y = self.layer_norm(x)
         else:
@@ -257,7 +262,7 @@ class Decoder(nn.Module):
             x += self.timing_signal[:, : inputs.shape[1], :].type_as(inputs.data)
 
             # Run decoder
-            y, _, attn_dist, _ = self.dec((x, encoder_output, [], (src_mask, dec_mask)))
+            y, _, attn_dist, _ = self.dec((x, encoder_output, [], (mask_src, dec_mask)))
 
             # Final layer normalization
             y = self.layer_norm(y)
@@ -310,54 +315,32 @@ class Generator(nn.Module):
             return F.log_softmax(logit, dim=-1)
 
 
-class MLP(nn.Module):
-    def __init__(self):
-        super(MLP, self).__init__()
-        input_num = 4 if config.woEMO else 5
-        input_dim = input_num * config.hidden_dim
-        hid_num = 2 if config.woEMO else 3
-        hid_dim = hid_num * config.hidden_dim
-        out_dim = config.hidden_dim
-
-        self.lin_1 = nn.Linear(input_dim, hid_dim, bias=False)
-        self.lin_2 = nn.Linear(hid_dim, out_dim, bias=False)
-
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        x = self.lin_1(x)
-        x = self.act(x)
-        x = self.lin_2(x)
-
-        return x
-
-
-class CEM(nn.Module):
+class Transformer(LightningModule):
     def __init__(
         self,
         vocab,
         decoder_number,
-        model_file_path=None,
-        is_eval=False,
-        load_optim=False,
+        config=config,
+        is_multitask=False,
     ):
-        super(CEM, self).__init__()
+        super(Transformer, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
-
-        self.word_freq = np.zeros(self.vocab_size)
-
-        self.is_eval = is_eval
-        self.rels = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
+        self.multitask = is_multitask
 
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
+        self.encoder = Encoder(
+            config.emb_dim,
+            config.hidden_dim,
+            num_layers=config.hop,
+            num_heads=config.heads,
+            total_key_depth=config.depth,
+            total_value_depth=config.depth,
+            filter_size=config.filter,
+            universal=config.universal,
+        )
 
-        self.encoder = self.make_encoder(config.emb_dim)
-        self.emo_encoder = self.make_encoder(config.emb_dim)
-        self.cog_encoder = self.make_encoder(config.emb_dim)
-        self.emo_ref_encoder = self.make_encoder(2 * config.emb_dim)
-        self.cog_ref_encoder = self.make_encoder(2 * config.emb_dim)
-
+        ## multiple decoders
         self.decoder = Decoder(
             config.emb_dim,
             hidden_size=config.hidden_dim,
@@ -368,20 +351,19 @@ class CEM(nn.Module):
             filter_size=config.filter,
         )
 
-        self.emo_lin = nn.Linear(config.hidden_dim, decoder_number, bias=False)
-        if not config.woCOG:
-            self.cog_lin = MLP()
-
+        self.decoder_key = nn.Linear(config.hidden_dim, decoder_number, bias=False)
         self.generator = Generator(config.hidden_dim, self.vocab_size)
-        self.activation = nn.Softmax(dim=1)
 
         if config.weight_sharing:
+            # Share the weight matrix between target word embedding & the final logit dense layer
             self.generator.proj.weight = self.embedding.lut.weight
 
-        self.criterion = nn.NLLLoss(ignore_index=config.PAD_idx, reduction="sum")
-        if not config.woDiv:
-            self.criterion.weight = torch.ones(self.vocab_size)
-        self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
+        self.criterion = nn.NLLLoss(ignore_index=config.PAD_idx)
+        if config.label_smoothing:
+            self.criterion = LabelSmoothing(
+                size=self.vocab_size, padding_idx=config.PAD_idx, smoothing=0.1
+            )
+            self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
         if config.noam:
@@ -392,132 +374,34 @@ class CEM(nn.Module):
                 torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
             )
 
-        if model_file_path is not None:
-            print("loading weights")
-            state = torch.load(model_file_path, map_location=config.device)
-            self.load_state_dict(state["model"])
-            if load_optim:
-                self.optimizer.load_state_dict(state["optimizer"])
-            self.eval()
+        # if model_file_path is not None:
+        #     print("loading weights")
+        #     state = torch.load(model_file_path, map_location=config.device)
+        #     self.load_state_dict(state["model"])
+        #     if load_optim:
+        #         self.optimizer.load_state_dict(state["optimizer"])
+        #     self.eval()
 
         self.model_dir = config.save_path
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
         self.best_path = ""
 
-    def make_encoder(self, emb_dim):
-        return Encoder(
-            emb_dim,
-            config.hidden_dim,
-            num_layers=config.hop,
-            num_heads=config.heads,
-            total_key_depth=config.depth,
-            total_value_depth=config.depth,
-            filter_size=config.filter,
-            universal=config.universal,
-        )
+    def training_step(self,batch,batch_idx):
+        loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
+        self.log('train_ppl',ppl)
+        self.log('train_loss',loss)
+        self.log('train_bce',bce)
+        self.log('train_acc',acc)
+        return loss
 
-    def save_model(self, running_avg_ppl, iter):
-        state = {
-            "iter": iter,
-            "optimizer": self.optimizer.state_dict(),
-            "current_loss": running_avg_ppl,
-            "model": self.state_dict(),
-        }
-        model_save_path = os.path.join(
-            self.model_dir,
-            "CEM_{}_{:.4f}".format(iter, running_avg_ppl),
-        )
-        self.best_path = model_save_path
-        torch.save(state, model_save_path)
-
-    def clean_preds(self, preds):
-        res = []
-        preds = preds.cpu().tolist()
-        for pred in preds:
-            if config.EOS_idx in pred:
-                ind = pred.index(config.EOS_idx) + 1  # end_idx included
-                pred = pred[:ind]
-            if len(pred) == 0:
-                continue
-            if pred[0] == config.SOS_idx:
-                pred = pred[1:]
-            res.append(pred)
-        return res
-
-    def update_frequency(self, preds):
-        curr = Counter()
-        for pred in preds:
-            curr.update(pred)
-        for k, v in curr.items():
-            if k != config.EOS_idx:
-                self.word_freq[k] += v
-
-    def calc_weight(self):
-        RF = self.word_freq / self.word_freq.sum()
-        a = -1 / RF.max()
-        weight = a * RF + 1
-        weight = weight / weight.sum() * len(weight)
-
-        return torch.FloatTensor(weight)
-
-    def forward(self, batch):
-        ## Encode the context (Semantic Knowledge)
-        enc_batch = batch["input_batch"]
-        src_mask = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        mask_emb = self.embedding(batch["mask_input"])
-        src_emb = self.embedding(enc_batch) + mask_emb
-        enc_outputs = self.encoder(src_emb, src_mask)  # batch_size * seq_len * 300
-
-        # Commonsense relations
-        cs_embs = []
-        cs_masks = []
-        cs_outputs = []
-        for r in self.rels:
-            emb = self.embedding(batch[r])
-            mask = batch[r].data.eq(config.PAD_idx).unsqueeze(1)
-            cs_embs.append(emb)
-            cs_masks.append(mask)
-            if r != "x_react":
-                enc_output = self.cog_encoder(emb, mask)
-            else:
-                enc_output = self.emo_encoder(emb, mask)
-            cs_outputs.append(enc_output)
-
-        cls_tokens = [c[:, 0].unsqueeze(1) for c in cs_outputs]
-
-        # Shape: batch_size * 1 * 300
-        cog_cls = cls_tokens[:-1]
-        emo_cls = torch.mean(cs_outputs[-1], dim=1).unsqueeze(1)
-
-        dim = [-1, enc_outputs.shape[1], -1]
-        # Emotion
-        if not config.woEMO:
-            emo_concat = torch.cat([enc_outputs, emo_cls.expand(dim)], dim=-1)
-            emo_ref_ctx = self.emo_ref_encoder(emo_concat, src_mask)
-            emo_logits = self.emo_lin(emo_ref_ctx[:, 0])
-        else:
-            emo_logits = self.emo_lin(enc_outputs[:, 0])
-
-        # Cognition
-        cog_outputs = []
-        for cls in cog_cls:
-            cog_concat = torch.cat([enc_outputs, cls.expand(dim)], dim=-1)
-            cog_concat_enc = self.cog_ref_encoder(cog_concat, src_mask)
-            cog_outputs.append(cog_concat_enc)
-
-        if config.woCOG:
-            cog_ref_ctx = emo_ref_ctx
-        else:
-            if config.woEMO:
-                cog_ref_ctx = torch.cat(cog_outputs, dim=-1)
-            else:
-                cog_ref_ctx = torch.cat(cog_outputs + [emo_ref_ctx], dim=-1)
-            cog_contrib = nn.Sigmoid()(cog_ref_ctx)
-            cog_ref_ctx = cog_contrib * cog_ref_ctx
-            cog_ref_ctx = self.cog_lin(cog_ref_ctx)
-
-        return src_mask, cog_ref_ctx, emo_logits
+    def validation_step(self,batch,batch_idx):
+        loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
+        self.log('valid_ppl',ppl)
+        self.log('valid_loss',loss)
+        self.log('valid_bce',bce)
+        self.log('valid_acc',acc)
+        return loss
 
     def train_one_batch(self, batch, iter, train=True):
         (
@@ -537,20 +421,22 @@ class CEM(nn.Module):
         else:
             self.optimizer.zero_grad()
 
-        src_mask, ctx_output, emo_logits = self.forward(batch)
+        ## Encode
+        mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
+
+        emb_mask = self.embedding(batch["mask_input"])
+        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
         # Decode
         sos_token = (
-            torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
-            .unsqueeze(1)
-            
-        )
-        dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), dim=1)
-        mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
+            torch.LongTensor([config.SOS_idx] * enc_batch.size(0)).unsqueeze(1)
+        ).to(config.device)
+        dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
-        # batch_size * seq_len * 300 (GloVe)
-        dec_emb = self.embedding(dec_batch_shift)
-        pre_logit, attn_dist = self.decoder(dec_emb, ctx_output, (src_mask, mask_trg))
+        mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
+        pre_logit, attn_dist = self.decoder(
+            self.embedding(dec_batch_shift), encoder_outputs, (mask_src, mask_trg)
+        )
 
         ## compute output dist
         logit = self.generator(
@@ -560,56 +446,56 @@ class CEM(nn.Module):
             extra_zeros,
             attn_dist_db=None,
         )
-
-        emo_label = torch.LongTensor(batch["program_label"])
-        emo_loss = nn.CrossEntropyLoss()(emo_logits, emo_label)
-        ctx_loss = self.criterion_ppl(
-            logit.contiguous().view(-1, logit.size(-1)),
-            dec_batch.contiguous().view(-1),
+        # logit = F.log_softmax(logit,dim=-1) #fix the name later
+        ## loss: NNL if ptr else Cross entropy
+        loss = self.criterion(
+            logit.contiguous().view(-1, logit.size(-1)), dec_batch.contiguous().view(-1)
         )
 
-        if not (config.woDiv):
-            _, preds = logit.max(dim=-1)
-            preds = self.clean_preds(preds)
-            self.update_frequency(preds)
-            self.criterion.weight = self.calc_weight()
-            not_pad = dec_batch.ne(config.PAD_idx)
-            target_tokens = not_pad.long().sum().item()
-            div_loss = self.criterion(
+        # multi-task
+        if self.multitask:
+            # q_h = torch.mean(encoder_outputs,dim=1)
+            q_h = encoder_outputs[:, 0]
+            logit_prob = self.decoder_key(q_h)
+            loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
+            ) + nn.CrossEntropyLoss()(
+                logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
             )
-            div_loss /= target_tokens
-            loss = emo_loss + 1.5 * div_loss + ctx_loss
+            loss_bce_program = nn.CrossEntropyLoss()(
+                logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
+            ).item()
+            pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
+            program_acc = accuracy_score(batch["program_label"], pred_program)
+
+        if config.label_smoothing:
+            loss_ppl = self.criterion_ppl(
+                logit.contiguous().view(-1, logit.size(-1)),
+                dec_batch.contiguous().view(-1),
+            ).item()
+
+  
+        if self.multitask:
+            if config.label_smoothing:
+                return (
+                    loss_ppl,
+                    math.exp(min(loss_ppl, 100)),
+                    loss_bce_program,
+                    program_acc,
+                )
+            else:
+                return (
+                    loss.item(),
+                    math.exp(min(loss.item(), 100)),
+                    loss_bce_program,
+                    program_acc,
+                )
         else:
-            loss = emo_loss + ctx_loss
-
-        pred_program = np.argmax(emo_logits.detach().cpu().numpy(), axis=1)
-        program_acc = accuracy_score(batch["program_label"], pred_program)
-
-        # print results for testing
-        top_preds = ""
-        comet_res = {}
-
-        if self.is_eval:
-            top_preds = emo_logits.detach().cpu().numpy().argsort()[0][-3:][::-1]
-            top_preds = f"{', '.join([MAP_EMO[pred.item()] for pred in top_preds])}"
-            for r in self.rels:
-                txt = [[" ".join(t) for t in tm] for tm in batch[f"{r}_txt"]][0]
-                comet_res[r] = txt
-
-        if train:
-            loss.backward()
-            self.optimizer.step()
-
-        return (
-            ctx_loss.item(),
-            math.exp(min(ctx_loss.item(), 100)),
-            emo_loss.item(),
-            program_acc,
-            top_preds,
-            comet_res,
-        )
+            if config.label_smoothing:
+                return loss_ppl, math.exp(min(loss_ppl, 100)), 0, 0
+            else:
+                return loss.item(), math.exp(min(loss.item(), 100)), 0, 0
 
     def compute_act_loss(self, module):
         R_t = module.remainders
@@ -621,7 +507,7 @@ class CEM(nn.Module):
 
     def decoder_greedy(self, batch, max_dec_step=30):
         (
-            _,
+            enc_batch,
             _,
             _,
             enc_batch_extend_vocab,
@@ -630,27 +516,32 @@ class CEM(nn.Module):
             _,
             _,
         ) = get_input_from_batch(batch)
-        src_mask, ctx_output, _ = self.forward(batch)
+        mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
+        emb_mask = self.embedding(batch["mask_input"])
+        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
-            ys_embed = self.embedding(ys)
             if config.project:
                 out, attn_dist = self.decoder(
-                    self.embedding_proj_in(ys_embed),
-                    self.embedding_proj_in(ctx_output),
-                    (src_mask, mask_trg),
+                    self.embedding_proj_in(self.embedding(ys)),
+                    self.embedding_proj_in(encoder_outputs),
+                    (mask_src, mask_trg),
                 )
             else:
                 out, attn_dist = self.decoder(
-                    ys_embed, ctx_output, (src_mask, mask_trg)
+                    self.embedding(ys), encoder_outputs, (mask_src, mask_trg)
                 )
 
             prob = self.generator(
                 out, attn_dist, enc_batch_extend_vocab, extra_zeros, attn_dist_db=None
             )
+            # logit = F.log_softmax(logit,dim=-1) #fix the name later
+            # filtered_logit = top_k_top_p_filtering(logit[:, -1], top_k=0, top_p=0, filter_value=-float('Inf'))
+            # Sample from the filtered distribution
+            # next_word = torch.multinomial(F.softmax(filtered_logit, dim=-1), 1).squeeze()
             _, next_word = torch.max(prob[:, -1], dim=1)
             decoded_words.append(
                 [
@@ -663,9 +554,9 @@ class CEM(nn.Module):
             next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)],
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
                 dim=1,
-            )
+            ).to(config.device)
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -690,33 +581,35 @@ class CEM(nn.Module):
             _,
             _,
         ) = get_input_from_batch(batch)
-        src_mask, ctx_output, _ = self.forward(batch)
+        mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
+        emb_mask = self.embedding(batch["mask_input"])
+        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
             if config.project:
                 out, attn_dist = self.decoder(
                     self.embedding_proj_in(self.embedding(ys)),
-                    self.embedding_proj_in(ctx_output),
-                    (src_mask, mask_trg),
+                    self.embedding_proj_in(encoder_outputs),
+                    (mask_src, mask_trg),
                 )
             else:
                 out, attn_dist = self.decoder(
-                    self.embedding(ys), ctx_output, (src_mask, mask_trg)
+                    self.embedding(ys), encoder_outputs, (mask_src, mask_trg)
                 )
 
             logit = self.generator(
                 out, attn_dist, enc_batch_extend_vocab, extra_zeros, attn_dist_db=None
             )
             filtered_logit = top_k_top_p_filtering(
-                logit[0, -1] / 0.7, top_k=0, top_p=0.9, filter_value=-float("Inf")
+                logit[:, -1], top_k=3, top_p=0, filter_value=-float("Inf")
             )
             # Sample from the filtered distribution
-            probs = F.softmax(filtered_logit, dim=-1)
-
-            next_word = torch.multinomial(probs, 1).squeeze()
+            next_word = torch.multinomial(
+                F.softmax(filtered_logit, dim=-1), 1
+            ).squeeze()
             decoded_words.append(
                 [
                     "<EOS>"
@@ -725,14 +618,12 @@ class CEM(nn.Module):
                     for ni in next_word.view(-1)
                 ]
             )
-            # _, next_word = torch.max(logit[:, -1], dim=1)
-            next_word = next_word.item()
+            next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)],
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
                 dim=1,
-            )
-            mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
+            ).to(config.device)
 
         sent = []
         for _, row in enumerate(np.transpose(decoded_words)):
@@ -744,3 +635,112 @@ class CEM(nn.Module):
                     st += e + " "
             sent.append(st)
         return sent
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(),lr=config.lr)
+
+
+### CONVERTED FROM https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py#L1062
+class ACT_basic(nn.Module):
+    def __init__(self, hidden_size):
+        super(ACT_basic, self).__init__()
+        self.sigma = nn.Sigmoid()
+        self.p = nn.Linear(hidden_size, 1)
+        self.p.bias.data.fill_(1)
+        self.threshold = 1 - 0.1
+
+    def forward(
+        self,
+        state,
+        inputs,
+        fn,
+        time_enc,
+        pos_enc,
+        max_hop,
+        encoder_output=None,
+        decoding=False,
+    ):
+        # init_hdd
+        ## [B, S]
+        halting_probability = torch.zeros(inputs.shape[0], inputs.shape[1]).to(
+            config.device
+        )
+        ## [B, S
+        remainders = torch.zeros(inputs.shape[0], inputs.shape[1]).to(config.device)
+        ## [B, S]
+        n_updates = torch.zeros(inputs.shape[0], inputs.shape[1]).to(config.device)
+        ## [B, S, HDD]
+        previous_state = torch.zeros_like(inputs).to(config.device)
+
+        step = 0
+        # for l in range(self.num_layers):
+        while (
+            ((halting_probability < self.threshold) & (n_updates < max_hop))
+            .byte()
+            .any()
+        ):
+            # Add timing signal
+            state = state + time_enc[:, : inputs.shape[1], :].type_as(inputs.data)
+            state = state + pos_enc[:, step, :].unsqueeze(1).repeat(
+                1, inputs.shape[1], 1
+            ).type_as(inputs.data)
+
+            p = self.sigma(self.p(state)).squeeze(-1)
+            # Mask for inputs which have not halted yet
+            still_running = (halting_probability < 1.0).float()
+
+            # Mask of inputs which halted at this step
+            new_halted = (
+                halting_probability + p * still_running > self.threshold
+            ).float() * still_running
+
+            # Mask of inputs which haven't halted, and didn't halt this step
+            still_running = (
+                halting_probability + p * still_running <= self.threshold
+            ).float() * still_running
+
+            # Add the halting probability for this step to the halting
+            # probabilities for those input which haven't halted yet
+            halting_probability = halting_probability + p * still_running
+
+            # Compute remainders for the inputs which halted at this step
+            remainders = remainders + new_halted * (1 - halting_probability)
+
+            # Add the remainders to those inputs which halted at this step
+            halting_probability = halting_probability + new_halted * remainders
+
+            # Increment n_updates for all inputs which are still running
+            n_updates = n_updates + still_running + new_halted
+
+            # Compute the weight to be applied to the new state and output
+            # 0 when the input has already halted
+            # p when the input hasn't halted yet
+            # the remainders when it halted this step
+            update_weights = p * still_running + new_halted * remainders
+
+            if decoding:
+                state, _, attention_weight = fn((state, encoder_output, []))
+            else:
+                # apply transformation on the state
+                state = fn(state)
+
+            # update running part in the weighted state and keep the rest
+            previous_state = (state * update_weights.unsqueeze(-1)) + (
+                previous_state * (1 - update_weights.unsqueeze(-1))
+            )
+            if decoding:
+                if step == 0:
+                    previous_att_weight = torch.zeros_like(attention_weight).to(
+                        config.device
+                    )  ## [B, S, src_size]
+                previous_att_weight = (
+                    attention_weight * update_weights.unsqueeze(-1)
+                ) + (previous_att_weight * (1 - update_weights.unsqueeze(-1)))
+            ## previous_state is actually the new_state at end of hte loop
+            ## to save a line I assigned to previous_state so in the next
+            ## iteration is correct. Notice that indeed we return previous_state
+            step += 1
+
+        if decoding:
+            return previous_state, previous_att_weight, (remainders, n_updates)
+        else:
+            return previous_state, (remainders, n_updates)
