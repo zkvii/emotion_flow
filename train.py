@@ -17,9 +17,11 @@ from torch.nn.init import xavier_normal_
 import torch.nn as nn
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
-    
+from pytorch_lightning.loggers import TensorBoardLogger 
 import os
 os.environ['CUDA_VISIBLE_DEVICES']=config.devices
+
+logger = TensorBoardLogger("em_logs", name=f"{config.model}",version='em')
 
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
@@ -81,6 +83,7 @@ def main():
         accelerator='gpu',
         callbacks=[checkpoint_callback],
         # progress_bar_refresh_rate=10
+        logger=logger
         )
     trainer.fit(model=model,train_dataloaders=train_loader,val_dataloaders=dev_loader)
 if __name__ == '__main__':
