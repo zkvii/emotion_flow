@@ -21,7 +21,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 import os
 os.environ['CUDA_VISIBLE_DEVICES']=config.devices
 
-logger = TensorBoardLogger("em_logs", name=f"{config.model}",version='em')
+logger = TensorBoardLogger("em_logs", name=f"{config.model}",version=f'{config.emotion_emb_type}')
 
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(

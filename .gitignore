@@ -171,3 +171,6 @@ save
 /data/glove/**
 /lightning_logs/
 lightning_logs/
+
+em_logs/
+emlogs/**
