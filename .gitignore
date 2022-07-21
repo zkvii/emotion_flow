@@ -174,3 +174,9 @@ lightning_logs/
 
 em_logs/
 emlogs/**
+only_train
+only_train/**
+train_and_test
+train_and_test/**
+only_test
+only_test/**
