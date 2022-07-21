@@ -12,9 +12,9 @@ from model.common import (
     _gen_timing_signal,
     _get_attn_subsequent_mask,
 )
+from pytorch_lightning import LightningModule
 
-
-class ComplexEmoAttentionLayer(nn.Module):
+class ComplexEmoAttentionLayer(LightningModule):
     """
     Represents one Decoder layer of the Transformer Decoder
     Refer Fig. 1 in https://arxiv.org/pdf/1706.03762.pdf
@@ -112,7 +112,7 @@ class ComplexEmoAttentionLayer(nn.Module):
         return y, m_concat, attention_weight, mask
 
 
-class ComplexResDecoder(nn.Module):
+class ComplexResDecoder(LightningModule):
     def __init__(
         self,
         embedding_size,

@@ -1,8 +1,9 @@
+import imp
 import torch
 import torch.nn as nn
+from pytorch_lightning import LightningModule
 
-
-class ComplexResGate(nn.Module):
+class ComplexResGate(LightningModule):
     def __init__(self, embedding_size):
         super(ComplexResGate, self).__init__()
         self.fc1 = nn.Linear(2 * embedding_size, 2 * embedding_size)

@@ -14,7 +14,8 @@ CLS_idx = 6
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")
-parser.add_argument("--emo_input", type=str, default="self_att")  # cross_att; self_att
+parser.add_argument("--emo_input", type=str,
+                    default="self_att")  # cross_att; self_att
 parser.add_argument("--emo_combine", type=str, default="gate")  # att; gate
 parser.add_argument("--decoder", type=str, default="single")  # single
 parser.add_argument("--vae", type=bool, default=False)
@@ -49,11 +50,13 @@ parser.add_argument("--woEMO", default=False, action="store_true")
 parser.add_argument("--woCOG", default=False, action="store_true")
 parser.add_argument("--woDiv", default=False, action="store_true")
 parser.add_argument("--large_decoder", action="store_true")
-parser.add_argument("--multitask", action="store_true",default=False)
+parser.add_argument("--multitask", action="store_true", default=False)
 parser.add_argument("--is_coverage", action="store_true")
 parser.add_argument("--use_oov_emb", action="store_true")
 parser.add_argument("--pretrain_emb", default=True, action="store_true")
 parser.add_argument("--test", action="store_true")
+parser.add_argument("--mode", type=str, default='only_test',
+                    help='only_test,train_and_test,only_train')
 parser.add_argument("--model", type=str, default="mime")
 parser.add_argument("--weight_sharing", action="store_true")
 parser.add_argument("--label_smoothing", default=True, action="store_true")
@@ -64,17 +67,15 @@ parser.add_argument("--act_loss_weight", type=float, default=0.001)
 
 parser.add_argument("--emb_file", type=str)
 # parser.add_argument("--ds_name", type=str,default='ds_pre')
-parser.add_argument("--emotion_emb_type", type=str,default='origin',help='condidates:order|origin|tolerance|random')
+parser.add_argument("--emotion_emb_type", type=str, default='origin',
+                    help='condidates:order|origin|tolerance|random')
 
-## transformer
+# transformer
 parser.add_argument("--hop", type=int, default=1)
 parser.add_argument("--heads", type=int, default=2)
 parser.add_argument("--depth", type=int, default=40)
 parser.add_argument("--filter", type=int, default=50)
 parser.add_argument("--devices", type=str, default='0')
-
-
-
 
 
 args = parser.parse_args()
@@ -126,8 +127,8 @@ model_path = args.model_path
 save_path_dataset = args.save_path_dataset
 
 test = args.test
-
-### transformer
+mode = args.mode
+# transformer
 hop = args.hop
 heads = args.heads
 depth = args.depth
@@ -148,9 +149,9 @@ woDiv = args.woDiv
 
 seed = args.seed
 devices = args.devices
-#preprocess
+# preprocess
 # ds_name=args.ds_name
-emotion_emb_type=args.emotion_emb_type
+emotion_emb_type = args.emotion_emb_type
 if test:
     pretrain_emb = False
 

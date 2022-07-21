@@ -1,4 +1,5 @@
 import os
+from more_itertools import numeric_range
 import nltk
 import json
 from pip import main
@@ -298,6 +299,7 @@ class Dataset(data.Dataset):
             item["emotion_context_mask"],
         ) = self.preprocess(item["emotion_context"])
 
+
         item["cs_text"] = self.data["utt_cs"][index]
         item["x_intent_txt"] = item["cs_text"][0]
         item["x_need_txt"] = item["cs_text"][1]
@@ -440,6 +442,9 @@ def collate_fn(data):
         pad_batch = pad_batch
         d[r] = pad_batch
         d[f"{r}_txt"] = item_info[f"{r}_txt"]
+    # for k in d:
+        # if type(d[k]) is torch.Tensor:
+            # d[k] = d[k].detach()
 
     return d
 
@@ -456,6 +461,7 @@ def prepare_data_seq(batch_size=32):
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_fn,
+        num_workers=0
     )
 
     dataset_valid = Dataset(pairs_val, vocab)
@@ -463,10 +469,12 @@ def prepare_data_seq(batch_size=32):
         dataset=dataset_valid,
         batch_size=batch_size,
         collate_fn=collate_fn,
+        num_workers=0
     )
     dataset_test = Dataset(pairs_tst, vocab)
     data_loader_tst = torch.utils.data.DataLoader(
         dataset=dataset_test, batch_size=1, shuffle=False, collate_fn=collate_fn,
+        num_workers=0
     )
     # save_config()
     return (

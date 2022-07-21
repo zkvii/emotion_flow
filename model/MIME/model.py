@@ -135,29 +135,6 @@ class MIME(LightningModule):
         else:
             self.attention_activation = nn.Sigmoid()  # nn.Softmax()
 
-        # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
-        # if config.noam:
-        #     self.optimizer = NoamOpt(
-        #         config.hidden_dim,
-        #         1,
-        #         8000,
-        #         torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
-        #     )
-
-        # if model_file_path is not None:
-        #     print("loading weights")
-        #     state = torch.load(model_file_path, map_location=config.device)
-        #     self.load_state_dict(state["model"])
-        #     if load_optim:
-        #         self.optimizer.load_state_dict(state["optimizer"])
-        #     self.eval()
-
-        # self.model_dir = config.save_path
-        # if not os.path.exists(self.model_dir):
-        #     os.makedirs(self.model_dir)
-        # self.best_path = ""
-
-        # Added positive emotions
         self.positive_emotions = [11, 16, 6, 8, 3, 1, 28, 13, 31, 17, 24, 0, 27]
         self.negative_emotions = [
             9,
@@ -238,19 +215,6 @@ class MIME(LightningModule):
         self.log('valid_bce',bce)
         self.log('valid_acc',acc)
         return loss
-    # def save_model(self, running_avg_ppl, iter):
-    #     state = {
-    #         "iter": iter,
-    #         "optimizer": self.optimizer.state_dict(),
-    #         "current_loss": running_avg_ppl,
-    #         "model": self.state_dict(),
-    #     }
-    #     model_save_path = os.path.join(
-    #         self.model_dir,
-    #         "MIME_{}_{:.4f}".format(iter, running_avg_ppl),
-    #     )
-    #     self.best_path = model_save_path
-    #     torch.save(state, model_save_path)
 
     def random_sampling(self, e):
         p = np.random.choice(self.positive_emotions)
@@ -432,9 +396,6 @@ class MIME(LightningModule):
                 dec_batch.contiguous().view(-1),
             )
 
-        # if train:
-        #     loss.backward()
-        #     self.optimizer.step()
 
         if config.label_smoothing:
             return loss_ppl, math.exp(min(loss_ppl, 100)), loss_bce_program, program_acc

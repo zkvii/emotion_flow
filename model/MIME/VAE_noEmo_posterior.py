@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from util import config
+from pytorch_lightning import LightningModule
 
-
-class VAESampling(nn.Module):
+class VAESampling(LightningModule):
     def __init__(self, hidden_dim, posterior_hidden_dim, out_dim=32):
         super().__init__()
         self.positive_emotions = [11, 16, 6, 8, 3, 1, 28, 13, 31, 17, 24, 0, 27]
@@ -161,8 +161,8 @@ class VAESampling(nn.Module):
             else:
                 emotions_mimic[i] = emotions_n[i]
                 emotions_non_mimic[i] = emotions_p[i]
-        emotions_mimic.to(config.device)
-        emotions_non_mimic.to(config.device)
+        # emotions_mimic.to(config.device)
+        # emotions_non_mimic.to(config.device)
 
         return emotions_mimic, emotions_non_mimic, mu_p, logvar_p, mu_n, logvar_n
 

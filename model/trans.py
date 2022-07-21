@@ -365,28 +365,9 @@ class Transformer(LightningModule):
                 size=self.vocab_size, padding_idx=config.PAD_idx, smoothing=0.1
             )
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
+        self.res={}
+        self.gdn={}
 
-        # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
-        # if config.noam:
-        #     self.optimizer = NoamOpt(
-        #         config.hidden_dim,
-        #         1,
-        #         8000,
-        #         torch.optim.Adam(self.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
-        #     )
-
-        # if model_file_path is not None:
-        #     print("loading weights")
-        #     state = torch.load(model_file_path, map_location=config.device)
-        #     self.load_state_dict(state["model"])
-        #     if load_optim:
-        #         self.optimizer.load_state_dict(state["optimizer"])
-        #     self.eval()
-
-        # self.model_dir = config.save_path
-        # if not os.path.exists(self.model_dir):
-        #     os.makedirs(self.model_dir)
-        # self.best_path = ""
 
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
@@ -402,6 +383,34 @@ class Transformer(LightningModule):
         self.log('valid_loss',loss)
         self.log('valid_bce',bce)
         self.log('valid_acc',acc)
+        return loss
+
+    def test_step(self,batch,batch_idx):
+
+
+        loss, ppl, bce, acc= self.train_one_batch(batch,batch_idx)
+
+        file_path=f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        outputs = open(file_path, 'a+', encoding='utf-8')
+        self.log('test_ppl',ppl)
+        self.log('test_loss',loss)
+        self.log('test_bce',bce)
+        self.log('test_acc',acc)
+        sent_g=self.decoder_greedy(batch)
+        ref, hyp_g= [], []
+        for i, greedy_sent in enumerate(sent_g):
+                rf = " ".join(batch["target_txt"][i])
+                hyp_g.append(greedy_sent)
+                ref.append(rf)
+                self.res[batch_idx] = greedy_sent.split()
+                self.gdn[batch_idx] = batch["target_txt"][i]  # targets.split()
+                outputs.write("Emotion:{} \n".format(batch["program_txt"][i]))
+                outputs.write("Context:{} \n".format(
+                    [" ".join(s) for s in batch['input_txt'][i]]))
+                # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
+                outputs.write("Pred:{} \n".format(greedy_sent))
+                outputs.write("Ref:{} \n".format(rf))
+
         return loss
 
     def train_one_batch(self, batch, iter, train=True):

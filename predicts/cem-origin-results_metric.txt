@@ -1,0 +1,4 @@
+./predicts/cem-origin-results.txt
+Dist-1	Dist-2
+0.28	1.01
+{'experiment': './predicts/cem-origin-results', 'blue1': 18.11, 'blue2': 7.93, 'bleu4': 2.53, 'bblue1': 17.05, 'bblue2': 7.83, 'bbleu4': 2.72}

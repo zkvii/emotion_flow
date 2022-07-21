@@ -3,9 +3,9 @@
 import torch
 import torch.nn as nn
 from model.moel import Encoder, Decoder
+from pytorch_lightning import LightningModule
 
-
-class EmotionInputEncoder(nn.Module):
+class EmotionInputEncoder(LightningModule):
     def __init__(
         self,
         emb_dim,

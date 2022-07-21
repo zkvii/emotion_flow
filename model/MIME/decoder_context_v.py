@@ -11,8 +11,9 @@ from model.common import (
     _get_attn_subsequent_mask,
 )
 
+from pytorch_lightning import LightningModule
 
-class DecoderLayerContextV(nn.Module):
+class DecoderLayerContextV(LightningModule):
     """
     Represents one Decoder layer of the Transformer Decoder
     Refer Fig. 1 in https://arxiv.org/pdf/1706.03762.pdf
@@ -124,7 +125,7 @@ class DecoderLayerContextV(nn.Module):
         return y, encoder_outputs, attention_weight, mask
 
 
-class DecoderContextV(nn.Module):
+class DecoderContextV(LightningModule):
     """
     A Transformer Decoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]

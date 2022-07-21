@@ -720,7 +720,9 @@ class Embeddings(nn.Module):
         self.d_model = d_model
 
     def forward(self, x):
-        return self.lut(x) * math.sqrt(self.d_model)
+        a=self.lut(x)
+        b=math.sqrt(self.d_model)
+        return a*b
 
 
 def share_embedding(vocab, pretrain=True):
