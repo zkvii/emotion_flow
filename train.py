@@ -21,7 +21,8 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
+# os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 logger = TensorBoardLogger(
     f"{config.mode}", name=f"{config.model}", version=f'{config.emotion_emb_type}')
@@ -84,6 +85,7 @@ def main():
     trainer = Trainer(
         max_epochs=12,
         accelerator='gpu',
+        gpus='0',
         callbacks=[checkpoint_callback],
         # progress_bar_refresh_rate=10
         logger=logger
