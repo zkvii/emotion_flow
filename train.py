@@ -96,6 +96,7 @@ def main():
         # progress_bar_refresh_rate=10
         logger=logger
     )
+    # trainer_test=Trainer(accelerator='gpu',checkpoint_callback=False,logger=False)
 
     checkpoint_path = f'./em_logs/{config.model}/{config.emotion_emb_type}/checkpoints/{config.model}-{config.emotion_emb_type}.ckpt'
     # trainer.fit(model=model, train_dataloaders=train_loader)
@@ -106,6 +107,8 @@ def main():
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)
         print('--------------------start test---------------------')
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint["state_dict"])
         trainer.test(model=model, dataloaders=test_loader)
     else:
         print('--------------------start test---------------------')
