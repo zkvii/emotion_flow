@@ -44,6 +44,8 @@ parser.add_argument("--l1", type=float, default=0.0)
 parser.add_argument("--softmax", default=True, action="store_true")
 parser.add_argument("--mean_query", action="store_true")
 parser.add_argument("--schedule", type=float, default=10000)
+parser.add_argument("--max_dec_step", type=int, default=50)
+parser.add_argument("--max_epoch", type=int, default=100)
 
 
 parser.add_argument("--woEMO", default=False, action="store_true")
@@ -118,7 +120,7 @@ use_oov_emb = args.use_oov_emb
 cov_loss_wt = 1.0
 lr_coverage = 0.15
 eps = 1e-12
-epochs = 10000
+max_epoch = args.max_epoch
 
 emb_file = args.emb_file or "vectors/glove.6B.{}d.txt".format(str(emb_dim))
 pretrain_emb = args.pretrain_emb
@@ -134,7 +136,7 @@ hop = args.hop
 heads = args.heads
 depth = args.depth
 filter = args.filter
-
+max_dec_step=args.max_dec_step
 
 label_smoothing = args.label_smoothing
 weight_sharing = args.weight_sharing

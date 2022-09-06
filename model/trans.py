@@ -24,6 +24,7 @@ from model.common import (
 from util import config
 from pytorch_lightning import LightningModule
 from sklearn.metrics import accuracy_score
+from model.translator.transformer_translator import Translator
 
 
 class Encoder(nn.Module):
@@ -377,7 +378,6 @@ class Transformer(LightningModule):
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
         self.res = {}
         self.gdn = {}
-        
 
     def training_step(self, batch, batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
@@ -406,6 +406,8 @@ class Transformer(LightningModule):
         self.log('test_bce', bce)
         self.log('test_acc', acc)
         sent_g = self.decoder_greedy(batch)
+        t = Translator(self, self.vocab)
+        sent_b = t.beam_search(batch, max_dec_step=config.max_dec_step)
         ref, hyp_g = [], []
         for i, greedy_sent in enumerate(sent_g):
             rf = " ".join(batch["target_txt"][i])
@@ -418,6 +420,7 @@ class Transformer(LightningModule):
                 [" ".join(s) for s in batch['input_txt'][i]]))
             # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
             outputs.write("Pred:{} \n".format(greedy_sent))
+            outputs.write(f"Beam:{sent_b[i]} \n")
             outputs.write("Ref:{} \n".format(rf))
 
         return loss
@@ -477,14 +480,15 @@ class Transformer(LightningModule):
             # q_h = torch.mean(encoder_outputs,dim=1)
             q_h = encoder_outputs[:, 0]
             logit_prob = self.decoder_key(q_h)
+            y_label = torch.LongTensor(batch["program_label"]).to(q_h.device)
+
             loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"])
-            )
+                logit_prob, y_label)
             loss_bce_program = nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"])
+                logit_prob, y_label
             )
             pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
             program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -540,7 +544,7 @@ class Transformer(LightningModule):
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(emb_mask.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -574,7 +578,7 @@ class Transformer(LightningModule):
             next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)],
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(ys.device)],
                 dim=1,
             )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)

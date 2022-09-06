@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from util import config
 from model.translator.beam import Beam
 
@@ -13,7 +12,7 @@ class Translator(object):
         self.lang = lang
         self.vocab_size = lang.n_words
         self.beam_size = config.beam_size
-        self.device = config.device
+        self.device = self.model.device
 
     def beam_search(self, src_seq, max_dec_step):
         """ Translation work in one batch """
@@ -116,16 +115,13 @@ class Translator(object):
                 mask_src,
                 encoder_db,
                 mask_transformer_db,
-                atten,
+                DB_ext_vocab_batch,
             ):
                 ## masking
                 mask_trg = dec_seq.data.eq(config.PAD_idx).unsqueeze(1)
                 mask_src = torch.cat([mask_src[0].unsqueeze(0)] * mask_trg.size(0), 0)
                 dec_output, attn_dist = self.model.decoder(
-                    self.model.embedding(dec_seq),
-                    enc_output,
-                    (mask_src, mask_trg),
-                    atten,
+                    self.model.embedding(dec_seq), enc_output, (mask_src, mask_trg)
                 )
 
                 db_dist = None
@@ -157,6 +153,7 @@ class Translator(object):
                 return active_inst_idx_list
 
             n_active_inst = len(inst_idx_to_position_map)
+
             dec_seq = prepare_beam_dec_seq(inst_dec_beams, len_dec_seq)
             dec_pos = prepare_beam_dec_pos(len_dec_seq, n_active_inst, n_bm)
             word_prob = predict_word(
@@ -171,7 +168,7 @@ class Translator(object):
                 mask_src,
                 encoder_db,
                 mask_transformer_db,
-                atten=self.attention_parameters,
+                DB_ext_vocab_batch,
             )
 
             # Update the beam with predicted word prob information and collect incomplete instances
@@ -207,42 +204,23 @@ class Translator(object):
             ) = get_input_from_batch(src_seq)
 
             mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
+
             emb_mask = self.model.embedding(src_seq["mask_input"])
             src_enc = self.model.encoder(
                 self.model.embedding(enc_batch) + emb_mask, mask_src
             )
+
             encoder_db = None
+
             mask_transformer_db = None
             DB_ext_vocab_batch = None
-
-            ## Attention over decoder
-            q_h = torch.mean(src_enc, dim=1) if config.mean_query else src_enc[:, 0]
-            # q_h = src_enc[:,0]
-            logit_prob = self.model.decoder_key(q_h)
-
-            if config.topk > 0:
-                k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
-                a = np.empty([logit_prob.shape[0], self.model.decoder_number])
-                a.fill(float("-inf"))
-                mask = torch.Tensor(a)
-                logit_prob = mask.scatter_(
-                    1, k_max_index.long(), k_max_value
-                )
-
-            attention_parameters = self.model.attention_activation(logit_prob)
-
-            if config.oracle:
-                attention_parameters = self.model.attention_activation(
-                    torch.FloatTensor(src_seq["target_program"]) * 1000
-                )
-            self.attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(-1)
 
             # -- Repeat data for beam search
             n_bm = self.beam_size
             n_inst, len_s, d_h = src_enc.size()
-            _, self.len_program, _, _ = self.attention_parameters.size()
             src_seq = enc_batch.repeat(1, n_bm).view(n_inst * n_bm, len_s)
             src_enc = src_enc.repeat(1, n_bm, 1).view(n_inst * n_bm, len_s, d_h)
+
             # -- Prepare beams
             inst_dec_beams = [Beam(n_bm, device=self.device) for _ in range(n_inst)]
 
@@ -304,10 +282,10 @@ def sequence_mask(sequence_length, max_len=None):
         max_len = sequence_length.data.max()
     batch_size = sequence_length.size(0)
     seq_range = torch.arange(0, max_len).long()
-    seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
-    seq_range_expand = seq_range_expand
-    if sequence_length.is_cuda:
-        seq_range_expand = seq_range_expand
+    seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len).to(sequence_length.device)
+    # seq_range_expand = seq_range_expand
+    # if sequence_length.is_cuda:
+        # seq_range_expand = seq_range_expand.to(seq_length_expand.device)
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
@@ -333,13 +311,13 @@ def get_input_from_batch(batch):
 
     coverage = None
     if config.is_coverage:
-        coverage = torch.zeros(enc_batch.size())
+        coverage = torch.zeros(enc_batch.size()).to(enc_batch.device)
 
     if enc_batch_extend_vocab is not None:
-        enc_batch_extend_vocab
+        enc_batch_extend_vocab.to(enc_batch.device)
     if extra_zeros is not None:
-        extra_zeros
-    c_t_1
+        extra_zeros.to(enc_batch.device)
+    c_t_1.to(enc_batch.device)
 
     return (
         enc_batch,
@@ -350,3 +328,4 @@ def get_input_from_batch(batch):
         c_t_1,
         coverage,
     )
+

@@ -42,6 +42,7 @@ def _compute_bleu(reference_corpus, translation_corpus, max_order=4, smooth=Fals
     possible_matches_by_order = [0] * max_order
     reference_length = 0
     translation_length = 0
+    
     for (references, translation) in zip(reference_corpus, translation_corpus):
         reference_length += min(len(r) for r in references)
         translation_length += len(translation)
@@ -155,11 +156,11 @@ def cal_one_model(file, opt=''):
         bbleu2=_compute_bleu(target, beam_preds, max_order=2)
         bbleu4=_compute_bleu(target, beam_preds, max_order=4)
         result.update( {
-            "blue1": round(bleu1[0]*100,2),
-            "blue2": round(bleu2[0]*100,2),
+            "bleu1": round(bleu1[0]*100,2),
+            "bleu2": round(bleu2[0]*100,2),
             "bleu4": round(bleu4[0]*100,2),
-            "bblue1": round(bbleu1[0]*100,2),
-            "bblue2": round(bbleu2[0]*100,2),
+            "bbleu1": round(bbleu1[0]*100,2),
+            "bbleu2": round(bbleu2[0]*100,2),
             "bbleu4": round(bbleu4[0]*100,2)
         })
 
@@ -172,7 +173,11 @@ def cal_one_model(file, opt=''):
 
     opt_f.write("Dist-1\tDist-2" +'\n')
     opt_f.write(f"{(mi_dist1 * 100):.2f}\t{(mi_dist2 * 100):.2f}\n")
-    opt_f.write(str(result))
+    opt_f.write('Bleu1\tBleu2\tBleu4\n')
+    opt_f.write(f"{result['bleu1']:.2f}\t{result['bleu2']:.2f}\t{result['bleu4']}\n")
+
+    opt_f.write('Beam-Blue1\tBeam-Blue2\tBeam-Blue4\n')
+    opt_f.write(f"{result['bbleu1']:.2f}\t{result['bbleu2']:.2f}\t{result['bbleu4']}\n")
     df=pd.DataFrame(result,index=[0])
     df['Dist-1']=mi_dist1*100
     df['Dist-2']=mi_dist2*100
@@ -181,5 +186,5 @@ def cal_one_model(file, opt=''):
 
 
 if __name__ == '__main__':
-    cal_one_model('./predicts/cem-origin-results.txt')
+    cal_one_model('./predicts/trans-origin-results.txt')
 

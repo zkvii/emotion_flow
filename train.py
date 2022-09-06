@@ -24,7 +24,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 logger = TensorBoardLogger(
-    f"{config.mode}", name=f"{config.model}", version=f'{config.emotion_emb_type}')
+    "em_logs", name=f"{config.model}", version=f'{config.emotion_emb_type}')
 
 
 def preprocess():
@@ -90,7 +90,7 @@ def main():
                 save_hparams_to_yaml(config_yaml=file_path, hparams=pl_module.hparams)
 
     trainer = Trainer(
-        max_epochs=12,
+        max_epochs=config.max_epoch,
         accelerator='gpu',
         callbacks=[checkpoint_callback,onCheckPointHparams()],
         # progress_bar_refresh_rate=10
@@ -116,6 +116,9 @@ def main():
         model.load_state_dict(checkpoint["state_dict"])
         # print(model)
         # model.load_from_checkpoint(checkpoint_path)
+        # clear old predicts if need overwrite use date
+        file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
 
 
