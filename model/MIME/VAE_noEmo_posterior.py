@@ -75,8 +75,8 @@ class VAESampling(LightningModule):
         return mu_positive, logvar_positive, mu_negative, logvar_positive
 
     def posterior(self, x, e, M_out, M_tilde_out):
-        h1_positive = torch.zeros(M_out.shape).to(config.device)
-        h1_negative = torch.zeros(M_out.shape).to(config.device)
+        h1_positive = torch.zeros(M_out.shape)
+        h1_negative = torch.zeros(M_out.shape)
         for i in range(len(e)):
             if self.is_pos(e[i]):
                 h1_positive[i] = M_out[i]
@@ -132,8 +132,8 @@ class VAESampling(LightningModule):
                 emotions_mimic[i] = emotions_n[i]
                 emotions_non_mimic[i] = emotions_p[i]
 
-        emotions_mimic.to(config.device)
-        emotions_non_mimic.to(config.device)
+        emotions_mimic
+        emotions_non_mimic
 
         return emotions_mimic, emotions_non_mimic, mu_p, logvar_p, mu_n, logvar_n
 
@@ -161,8 +161,8 @@ class VAESampling(LightningModule):
             else:
                 emotions_mimic[i] = emotions_n[i]
                 emotions_non_mimic[i] = emotions_p[i]
-        # emotions_mimic.to(config.device)
-        # emotions_non_mimic.to(config.device)
+        # emotions_mimic
+        # emotions_non_mimic
 
         return emotions_mimic, emotions_non_mimic, mu_p, logvar_p, mu_n, logvar_n
 
@@ -172,10 +172,10 @@ class VAESampling(LightningModule):
         This code is adapted from:
         https://github.com/ctr4si/A-Hierarchical-Latent-Structure-for-Variational-Conversation-Modeling/blob/83ca9dd96272d3a38978a1dfa316d06d5d6a7c77/model/utils/probability.py#L20
         """
-        one = torch.FloatTensor([1.0]).to(config.device)
+        one = torch.FloatTensor([1.0])
         if mu_prior == None:
-            mu_prior = torch.FloatTensor([0.0]).to(config.device)
-            logvar_prior = torch.FloatTensor([0.0]).to(config.device)
+            mu_prior = torch.FloatTensor([0.0])
+            logvar_prior = torch.FloatTensor([0.0])
         kl_div = torch.sum(
             0.5
             * (

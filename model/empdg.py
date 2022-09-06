@@ -411,9 +411,7 @@ class Generator(nn.Module):
                 [enc_batch_extend_vocab.unsqueeze(1)] * x.size(1), 1
             )  ## extend for all seq
 
-            extra_zeros = Variable(torch.zeros((logit.size(0), max_oov_length))).to(
-                config.device
-            )
+            extra_zeros = Variable(torch.zeros((logit.size(0), max_oov_length)))
             if extra_zeros is not None:
                 extra_zeros = torch.cat([extra_zeros.unsqueeze(1)] * x.size(1), 1)
                 vocab_dist_ = torch.cat([vocab_dist_, extra_zeros], 2)
@@ -606,7 +604,7 @@ class EMPDG(LightningModule):
                 (emo_encoder_outputs[:, 0, :], sem_encoder_outputs[:, 0, :]), dim=-1
             )
         )  # (bsz, decoder_number)
-        emo_label = torch.LongTensor(batch["program_label"]).to(config.device)
+        emo_label = torch.LongTensor(batch["program_label"])
         loss_emotion = nn.CrossEntropyLoss()(emotion_logit, emo_label)
         pred_emotion = np.argmax(emotion_logit.detach().cpu().numpy(), axis=1)
         emotion_acc = accuracy_score(batch["program_label"], pred_emotion)
@@ -717,7 +715,7 @@ class EMPDG(LightningModule):
         )  # (bsz, src_len, emb_dim)
         mask_src = torch.cat((mask_semantic, mask_emotion), dim=2)  # (bsz, 1, src_len)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         ys_emb = self.emotion_embedding(emotion_logit).unsqueeze(1)  # (bsz, 1, emb_dim)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
@@ -747,7 +745,7 @@ class EMPDG(LightningModule):
 
             ys = torch.cat(
                 [ys, torch.ones(1, 1).long().fill_(next_word).cuda()], dim=1
-            ).to(config.device)
+            )
             ys_emb = torch.cat(
                 (
                     ys_emb,

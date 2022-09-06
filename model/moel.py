@@ -567,9 +567,9 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a).to(config.device)
+            mask = torch.Tensor(a)
             logit_prob_ = mask.scatter_(
-                1, k_max_index.to(config.device).long(), k_max_value
+                1, k_max_index.long(), k_max_value
             )
             attention_parameters = self.attention_activation(logit_prob_)
         else:
@@ -580,7 +580,7 @@ class MOEL(LightningModule):
         if config.oracle:
             attention_parameters = self.attention_activation(
                 torch.FloatTensor(batch["target_program"]) * 1000
-            ).to(config.device)
+            )
         attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(
             -1
         )  # (batch_size, expert_num, 1, 1)
@@ -589,7 +589,6 @@ class MOEL(LightningModule):
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
-            .to(config.device)
         )
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
@@ -624,20 +623,20 @@ class MOEL(LightningModule):
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
+                logit_prob, torch.LongTensor(batch["program_label"])
             )
             loss_bce_program = nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"]).to(config.device)
+                logit_prob, torch.LongTensor(batch["program_label"])
             )
         else:
             loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(config.device)
+                logit_prob, torch.FloatTensor(batch["target_program"])
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(config.device)
+                logit_prob, torch.FloatTensor(batch["target_program"])
             )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -697,9 +696,9 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a).to(config.device)
+            mask = torch.Tensor(a)
             logit_prob = mask.scatter_(
-                1, k_max_index.to(config.device).long(), k_max_value
+                1, k_max_index.long(), k_max_value
             )
 
         attention_parameters = self.attention_activation(logit_prob)
@@ -707,12 +706,12 @@ class MOEL(LightningModule):
         if config.oracle:
             attention_parameters = self.attention_activation(
                 torch.FloatTensor(batch["target_program"]) * 1000
-            ).to(config.device)
+            )
         attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(
             -1
         )  # (batch_size, expert_num, 1, 1)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -747,9 +746,9 @@ class MOEL(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -791,9 +790,9 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a).to(config.device)
+            mask = torch.Tensor(a)
             logit_prob = mask.scatter_(
-                1, k_max_index.to(config.device).long(), k_max_value
+                1, k_max_index.long(), k_max_value
             )
 
         attention_parameters = self.attention_activation(logit_prob)
@@ -801,12 +800,12 @@ class MOEL(LightningModule):
         if config.oracle:
             attention_parameters = self.attention_activation(
                 torch.FloatTensor(batch["target_program"]) * 1000
-            ).to(config.device)
+            )
         attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(
             -1
         )  # (batch_size, expert_num, 1, 1)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -846,9 +845,9 @@ class MOEL(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)],
+                [ys, torch.ones(1, 1).long().fill_(next_word)],
                 dim=1,
-            ).to(config.device)
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -890,11 +889,11 @@ class ACT_basic(nn.Module):
             config.device
         )
         ## [B, S
-        remainders = torch.zeros(inputs.shape[0], inputs.shape[1]).to(config.device)
+        remainders = torch.zeros(inputs.shape[0], inputs.shape[1])
         ## [B, S]
-        n_updates = torch.zeros(inputs.shape[0], inputs.shape[1]).to(config.device)
+        n_updates = torch.zeros(inputs.shape[0], inputs.shape[1])
         ## [B, S, HDD]
-        previous_state = torch.zeros_like(inputs).to(config.device)
+        previous_state = torch.zeros_like(inputs)
 
         step = 0
         # for l in range(self.num_layers):

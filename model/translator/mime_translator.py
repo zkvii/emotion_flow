@@ -258,7 +258,7 @@ class Translator(object):
                 else self.model.negative_emotions[0]
                 for d in batch["context_emotion_scores"]
             ]
-            context_emo = torch.Tensor(context_emo).to(config.device)
+            context_emo = torch.Tensor(context_emo)
 
             if config.noam:
                 self.model.optimizer.optimizer.zero_grad()
@@ -292,7 +292,7 @@ class Translator(object):
                     else self.model.negative_emotions[0]
                     for d in batch["context_emotion_scores"]
                 ]
-                context_emo = torch.Tensor(context_emo).to(config.device)
+                context_emo = torch.Tensor(context_emo)
                 (
                     emotions_mimic,
                     emotions_non_mimic,
@@ -323,10 +323,10 @@ class Translator(object):
                 ) = self.model.vae_sampler(q_h, emo_pred, self.model.emoji_embedding)
 
             m_out = self.model.emotion_input_encoder_1(
-                emotions_mimic.unsqueeze(1).to(config.device), encoder_outputs, mask_src
+                emotions_mimic.unsqueeze(1), encoder_outputs, mask_src
             )
             m_tilde_out = self.model.emotion_input_encoder_2(
-                emotions_non_mimic.unsqueeze(1).to(config.device),
+                emotions_non_mimic.unsqueeze(1),
                 encoder_outputs,
                 mask_src,
             )
@@ -361,8 +361,8 @@ class Translator(object):
                 k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
                 a = np.empty([logit_prob.shape[0], self.model.decoder_number])
                 a.fill(float("-inf"))
-                mask = torch.Tensor(a).to(config.device)
-                k_max_index.to(config.device)
+                mask = torch.Tensor(a)
+                k_max_index
                 logit_prob = mask.scatter_(1, k_max_index.long(), k_max_value)
 
             attention_parameters = self.model.attention_activation(logit_prob)
@@ -370,7 +370,7 @@ class Translator(object):
             if config.oracle:
                 attention_parameters = self.model.attention_activation(
                     torch.FloatTensor(src_seq["target_program"]) * 1000
-                ).to(config.device)
+                )
             self.attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(-1)
 
             # -- Repeat data for beam search
@@ -443,7 +443,7 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range = torch.arange(0, max_len).long()
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     seq_range_expand = seq_range_expand
-    seq_range_expand.to(config.device)
+    seq_range_expand
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
@@ -465,17 +465,17 @@ def get_input_from_batch(batch):
         if batch["max_art_oovs"] > 0:
             extra_zeros = torch.zeros((batch_size, batch["max_art_oovs"]))
 
-    c_t_1 = torch.zeros((batch_size, 2 * config.hidden_dim)).to(config.device)
+    c_t_1 = torch.zeros((batch_size, 2 * config.hidden_dim))
 
     coverage = None
     if config.is_coverage:
-        coverage = torch.zeros(enc_batch.size()).to(config.device)
+        coverage = torch.zeros(enc_batch.size())
 
     if enc_batch_extend_vocab is not None:
-        enc_batch_extend_vocab.to(config.device)
+        enc_batch_extend_vocab
 
     if extra_zeros is not None:
-        extra_zeros.to(config.device)
+        extra_zeros
 
     return (
         enc_batch,

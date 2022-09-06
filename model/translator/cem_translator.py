@@ -214,7 +214,7 @@ class Translator(object):
             cs_masks = []
             cs_outputs = []
             for r in self.model.rels:
-                emb = self.model.embedding(src_seq[r]).to(config.device)
+                emb = self.model.embedding(src_seq[r])
                 mask = src_seq[r].data.eq(config.PAD_idx).unsqueeze(1)
                 cs_embs.append(emb)
                 cs_masks.append(mask)
@@ -329,7 +329,7 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     seq_range_expand = seq_range_expand
     if sequence_length.is_cuda:
-        seq_range_expand = seq_range_expand.to(config.device)
+        seq_range_expand = seq_range_expand
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
@@ -355,13 +355,13 @@ def get_input_from_batch(batch):
 
     coverage = None
     if config.is_coverage:
-        coverage = torch.zeros(enc_batch.size()).to(config.device)
+        coverage = torch.zeros(enc_batch.size())
 
     if enc_batch_extend_vocab is not None:
-        enc_batch_extend_vocab.to(config.device)
+        enc_batch_extend_vocab
     if extra_zeros is not None:
-        extra_zeros.to(config.device)
-    c_t_1.to(config.device)
+        extra_zeros
+    c_t_1
 
     return (
         enc_batch,

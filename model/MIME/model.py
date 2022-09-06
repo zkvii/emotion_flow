@@ -112,7 +112,7 @@ class MIME(LightningModule):
         method3 = True
         if method3:
             self.e_weight = nn.Linear(config.emb_dim, config.emb_dim, bias=True)
-            self.v = torch.rand(config.emb_dim, requires_grad=True).to(config.device)
+            self.v = torch.rand(config.emb_dim, requires_grad=True)
 
         self.generator = Generator(config.hidden_dim, self.vocab_size)
         self.emoji_embedding = nn.Embedding(32, config.emb_dim)
@@ -264,10 +264,10 @@ class MIME(LightningModule):
         # KLLoss = -0.5 * (torch.sum(1 + logvar_n - mu_n.pow(2) - logvar_n.exp()) + torch.sum(1 + logvar_p - mu_p.pow(2) - logvar_p.exp()))
 
         m_out = self.emotion_input_encoder_1(
-            emotions_mimic.unsqueeze(1).to(config.device), encoder_outputs, mask_src
+            emotions_mimic.unsqueeze(1), encoder_outputs, mask_src
         )
         m_tilde_out = self.emotion_input_encoder_2(
-            emotions_non_mimic.unsqueeze(1).to(config.device), encoder_outputs, mask_src
+            emotions_non_mimic.unsqueeze(1), encoder_outputs, mask_src
         )
         if train:
             (
@@ -322,7 +322,7 @@ class MIME(LightningModule):
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
-            .to(config.device)
+            
         )
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
@@ -350,7 +350,7 @@ class MIME(LightningModule):
                 config.oracle = False
 
         if config.softmax:
-            program_label = torch.LongTensor(batch["program_label"]).to(config.device)
+            program_label = torch.LongTensor(batch["program_label"])
 
             if config.emo_combine == "gate":
                 L1_loss = nn.CrossEntropyLoss()(logit_prob, program_label)
@@ -365,7 +365,7 @@ class MIME(LightningModule):
             else:
                 L1_loss = nn.CrossEntropyLoss()(
                     logit_prob,
-                    torch.LongTensor(batch["program_label"]).to(config.device),
+                    torch.LongTensor(batch["program_label"]),
                 )
                 loss = (
                     self.criterion(
@@ -382,10 +382,10 @@ class MIME(LightningModule):
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(config.device)
+                logit_prob, torch.FloatTensor(batch["target_program"])
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(config.device)
+                logit_prob, torch.FloatTensor(batch["target_program"])
             )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -453,7 +453,7 @@ class MIME(LightningModule):
                 else self.negative_emotions[0]
                 for d in batch["context_emotion_scores"]
             ]
-            context_emo = torch.Tensor(context_emo).to(config.device)
+            context_emo = torch.Tensor(context_emo)
             (
                 emotions_mimic,
                 emotions_non_mimic,
@@ -482,10 +482,10 @@ class MIME(LightningModule):
             ) = self.vae_sampler(q_h, emo_pred, self.emoji_embedding)
 
         m_out = self.emotion_input_encoder_1(
-            emotions_mimic.unsqueeze(1).to(config.device), encoder_outputs, mask_src
+            emotions_mimic.unsqueeze(1), encoder_outputs, mask_src
         )
         m_tilde_out = self.emotion_input_encoder_2(
-            emotions_non_mimic.unsqueeze(1).to(config.device), encoder_outputs, mask_src
+            emotions_non_mimic.unsqueeze(1), encoder_outputs, mask_src
         )
 
         if config.emo_combine == "att":
@@ -498,7 +498,7 @@ class MIME(LightningModule):
             m_tilde_weight = 1 - m_weight
             v = m_weight * m_weight + m_tilde_weight * m_tilde_out
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -529,8 +529,8 @@ class MIME(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)], dim=1
-            ).to(config.device)
+                [ys, torch.ones(1, 1).long().fill_(next_word)], dim=1
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
@@ -564,7 +564,7 @@ class MIME(LightningModule):
             else self.negative_emotions[0]
             for d in batch["context_emotion_scores"]
         ]
-        context_emo = torch.Tensor(context_emo).to(config.device)
+        context_emo = torch.Tensor(context_emo)
 
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
@@ -589,7 +589,7 @@ class MIME(LightningModule):
                 else self.negative_emotions[0]
                 for d in batch["context_emotion_scores"]
             ]
-            context_emo = torch.Tensor(context_emo).to(config.device)
+            context_emo = torch.Tensor(context_emo)
             (
                 emotions_mimic,
                 emotions_non_mimic,
@@ -634,7 +634,7 @@ class MIME(LightningModule):
             m_tilde_weight = 1 - m_weight
             v = m_weight * m_weight + m_tilde_weight * m_tilde_out
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(config.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -671,8 +671,8 @@ class MIME(LightningModule):
             next_word = next_word.data.item()
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).to(config.device)], dim=1
-            ).to(config.device)
+                [ys, torch.ones(1, 1).long().fill_(next_word)], dim=1
+            )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []

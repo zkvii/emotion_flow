@@ -224,9 +224,9 @@ class Translator(object):
                 k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
                 a = np.empty([logit_prob.shape[0], self.model.decoder_number])
                 a.fill(float("-inf"))
-                mask = torch.Tensor(a).to(config.device)
+                mask = torch.Tensor(a)
                 logit_prob = mask.scatter_(
-                    1, k_max_index.to(config.device).long(), k_max_value
+                    1, k_max_index.long(), k_max_value
                 )
 
             attention_parameters = self.model.attention_activation(logit_prob)
@@ -234,7 +234,7 @@ class Translator(object):
             if config.oracle:
                 attention_parameters = self.model.attention_activation(
                     torch.FloatTensor(src_seq["target_program"]) * 1000
-                ).to(config.device)
+                )
             self.attention_parameters = attention_parameters.unsqueeze(-1).unsqueeze(-1)
 
             # -- Repeat data for beam search
@@ -307,7 +307,7 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     seq_range_expand = seq_range_expand
     if sequence_length.is_cuda:
-        seq_range_expand = seq_range_expand.to(config.device)
+        seq_range_expand = seq_range_expand
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
@@ -333,13 +333,13 @@ def get_input_from_batch(batch):
 
     coverage = None
     if config.is_coverage:
-        coverage = torch.zeros(enc_batch.size()).to(config.device)
+        coverage = torch.zeros(enc_batch.size())
 
     if enc_batch_extend_vocab is not None:
-        enc_batch_extend_vocab.to(config.device)
+        enc_batch_extend_vocab
     if extra_zeros is not None:
-        extra_zeros.to(config.device)
-    c_t_1.to(config.device)
+        extra_zeros
+    c_t_1
 
     return (
         enc_batch,

@@ -25,7 +25,7 @@ parser.add_argument("--init_emo_emb", action="store_true")
 
 parser.add_argument("--hidden_dim", type=int, default=300)
 parser.add_argument("--emb_dim", type=int, default=300)
-parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--lr", type=float, default=0.0001)
 parser.add_argument("--max_grad_norm", type=float, default=2.0)
 parser.add_argument("--beam_size", type=int, default=5)
@@ -33,7 +33,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--save_path", type=str, default="save/test")
 parser.add_argument("--model_path", type=str, default="save/test")
 parser.add_argument("--save_path_dataset", type=str, default="save/")
-parser.add_argument("--cuda", default=True, action="store_true")
+# parser.add_argument("--cuda", default=True, action="store_true")
 
 parser.add_argument("--pointer_gen", action="store_true")
 parser.add_argument("--oracle", action="store_true")
@@ -57,7 +57,8 @@ parser.add_argument("--pretrain_emb", default=True, action="store_true")
 parser.add_argument("--test", action="store_true")
 parser.add_argument("--mode", type=str, default='only_test',
                     help='only_test,train_and_test,only_train')
-parser.add_argument("--model", type=str, default="mime")
+
+parser.add_argument("--model", type=str, default="trans")
 parser.add_argument("--weight_sharing", action="store_true")
 parser.add_argument("--label_smoothing", default=True, action="store_true")
 parser.add_argument("--noam", default=True, action="store_true")
@@ -110,7 +111,7 @@ vae = args.vae
 eq6_loss = args.eq6_loss
 vader_loss = args.vader_loss
 init_emo_emb = args.init_emo_emb
-device = torch.device("cuda" if args.cuda else "cpu")
+# device = torch.device("cuda" if args.cuda else "cpu")
 pointer_gen = args.pointer_gen
 is_coverage = args.is_coverage
 use_oov_emb = args.use_oov_emb

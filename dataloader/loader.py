@@ -158,7 +158,7 @@ def encode(vocab, files):
         "emotion_context": [],
         "utt_cs": [],
     }
-    comet = Comet("./data/ED/comet",device='cuda')
+    comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
         items = files[i]
@@ -454,14 +454,14 @@ def prepare_data_seq(batch_size=32):
     pairs_tra, pairs_val, pairs_tst, vocab = load_dataset()
 
     logging.info("Vocab  {} ".format(vocab.n_words))
-
+    num_workers=8
     dataset_train = Dataset(pairs_tra, vocab)
     data_loader_tra = torch.utils.data.DataLoader(
         dataset=dataset_train,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_fn,
-        num_workers=0
+        num_workers=num_workers
     )
 
     dataset_valid = Dataset(pairs_val, vocab)
@@ -469,12 +469,12 @@ def prepare_data_seq(batch_size=32):
         dataset=dataset_valid,
         batch_size=batch_size,
         collate_fn=collate_fn,
-        num_workers=0
+        num_workers=num_workers
     )
     dataset_test = Dataset(pairs_tst, vocab)
     data_loader_tst = torch.utils.data.DataLoader(
         dataset=dataset_test, batch_size=1, shuffle=False, collate_fn=collate_fn,
-        num_workers=0
+        num_workers=num_workers
     )
     # save_config()
     return (
