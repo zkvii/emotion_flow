@@ -27,6 +27,15 @@ logger = TensorBoardLogger(
     "em_logs", name=f"{config.model}", version=f'{config.emotion_emb_type}')
 
 
+def print_opts(opts):
+    """Prints the values of all command-line arguments."""
+    print("=" * 80)
+    print("Opts".center(80))
+    print("-" * 80)
+    for key in opts.__dict__:
+        if opts.__dict__[key]:
+            print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
+    print("=" * 80)
 def preprocess():
     train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
         batch_size=config.batch_size
@@ -82,22 +91,23 @@ def main():
     checkpoint_callback = ModelCheckpoint(
         monitor="valid_ppl", filename=f"{config.model}-{config.emotion_emb_type}", mode="min")
 
-    class onCheckPointHparams(Callback):
-        def on_save_checkpoint(self, trainer, pl_module, checkpoint):
-            if trainer.current_epoch == 0:
-                file_path = f"{trainer.logger.log_dir}/hparams.yaml"
-                print(f"Saving hparams to file_path: {file_path}")
-                save_hparams_to_yaml(config_yaml=file_path, hparams=pl_module.hparams)
+    # class onCheckPointHparams(Callback):
+    #     def on_save_checkpoint(self, trainer, pl_module, checkpoint):
+    #         if trainer.current_epoch == 0:
+    #             file_path = f"{trainer.logger.log_dir}/hparams.yaml"
+    #             print(f"Saving hparams to file_path: {file_path}")
+    #             save_hparams_to_yaml(config_yaml=file_path, hparams=pl_module.hparams)
 
     trainer = Trainer(
         max_epochs=config.max_epoch,
         accelerator='gpu',
-        callbacks=[checkpoint_callback,onCheckPointHparams()],
+        # callbacks=[checkpoint_callback,onCheckPointHparams()],
+        callbacks=[checkpoint_callback],
         # progress_bar_refresh_rate=10
         logger=logger
     )
     # trainer_test=Trainer(accelerator='gpu',checkpoint_callback=False,logger=False)
-
+    print_opts(config.args)
     checkpoint_path = f'./em_logs/{config.model}/{config.emotion_emb_type}/checkpoints/{config.model}-{config.emotion_emb_type}.ckpt'
     # trainer.fit(model=model, train_dataloaders=train_loader)
     if config.mode == 'only_train':
