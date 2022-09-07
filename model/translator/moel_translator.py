@@ -304,10 +304,10 @@ def sequence_mask(sequence_length, max_len=None):
         max_len = sequence_length.data.max()
     batch_size = sequence_length.size(0)
     seq_range = torch.arange(0, max_len).long()
-    seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
-    seq_range_expand = seq_range_expand
-    if sequence_length.is_cuda:
-        seq_range_expand = seq_range_expand.to(sequence_length.device)
+    seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len).to(sequence_length.device)
+    # seq_range_expand = seq_range_expand
+    # if sequence_length.is_cuda:
+        # seq_range_expand = seq_range_expand.to(sequence_length.device)
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
