@@ -1,4 +1,4 @@
-import os, math, random
+import math, random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,7 +9,6 @@ from pytorch_lightning import LightningModule
 from model.common import (
     share_embedding,
     LabelSmoothing,
-    NoamOpt,
     get_input_from_batch,
     get_output_from_batch,
     top_k_top_p_filtering,
@@ -20,7 +19,7 @@ from model.MIME.complex_res_attention import ComplexResDecoder
 from model.MIME.complex_res_gate import ComplexResGate
 from model.MIME.decoder_context_v import DecoderContextV
 from model.MIME.VAE_noEmo_posterior import VAESampling
-
+from model.translator.mime_translator import Translator
 
 class MIME(LightningModule):
     """
@@ -158,6 +157,9 @@ class MIME(LightningModule):
             12,
         ]
 
+
+        self.res={}
+        self.gdn={}
     def init_emoji_embedding_with_glove(self):
         self.emotions = [
             "surprised",
@@ -214,6 +216,34 @@ class MIME(LightningModule):
         self.log('valid_loss',loss)
         self.log('valid_bce',bce)
         self.log('valid_acc',acc)
+        return loss
+
+    def test_step(self,batch,batch_idx):
+        # loss, ppl, bce, acc, top_preds, comet_res= self.train_one_batch(batch,batch_idx)
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+        file_path=f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        outputs = open(file_path, 'a+', encoding='utf-8')
+        self.log('test_ppl',ppl)
+        self.log('test_loss',loss)
+        self.log('test_bce',bce)
+        self.log('test_acc',acc)
+        sent_g=self.decoder_greedy(batch)
+        t=Translator(self,self.vocab)
+        sent_b = t.beam_search(batch,config.max_dec_step)
+        ref, hyp_g= [], []
+        for i, greedy_sent in enumerate(sent_g):
+                rf = " ".join(batch["target_txt"][i])
+                hyp_g.append(greedy_sent)
+                ref.append(rf)
+                self.res[batch_idx] = greedy_sent.split()
+                self.gdn[batch_idx] = batch["target_txt"][i]  # targets.split()
+                outputs.write(f"Emotion:{batch['program_txt'][i]} \n")
+                outputs.write(f"Context:{[' '.join(s) for s in batch['input_txt'][i]]} \n")
+                # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
+                outputs.write(f"Pred:{greedy_sent} \n")
+                outputs.write(f"Beam:{sent_b[i]} \n")
+                outputs.write(f"Ref:{rf} \n")
+
         return loss
 
     def random_sampling(self, e):
@@ -323,7 +353,7 @@ class MIME(LightningModule):
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
             
-        )
+        ).to(self.device)
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
         mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
@@ -350,7 +380,7 @@ class MIME(LightningModule):
                 config.oracle = False
 
         if config.softmax:
-            program_label = torch.LongTensor(batch["program_label"])
+            program_label = torch.LongTensor(batch["program_label"]).to(self.device)
 
             if config.emo_combine == "gate":
                 L1_loss = nn.CrossEntropyLoss()(logit_prob, program_label)
@@ -365,7 +395,7 @@ class MIME(LightningModule):
             else:
                 L1_loss = nn.CrossEntropyLoss()(
                     logit_prob,
-                    torch.LongTensor(batch["program_label"]),
+                    program_label,
                 )
                 loss = (
                     self.criterion(
@@ -382,10 +412,10 @@ class MIME(LightningModule):
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"])
+                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"])
+                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
             )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -498,7 +528,7 @@ class MIME(LightningModule):
             m_tilde_weight = 1 - m_weight
             v = m_weight * m_weight + m_tilde_weight * m_tilde_out
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -529,7 +559,7 @@ class MIME(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)], dim=1
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1
             )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 

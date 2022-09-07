@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from util import config
 from pytorch_lightning import LightningModule
 
 class VAESampling(LightningModule):
@@ -75,8 +74,8 @@ class VAESampling(LightningModule):
         return mu_positive, logvar_positive, mu_negative, logvar_positive
 
     def posterior(self, x, e, M_out, M_tilde_out):
-        h1_positive = torch.zeros(M_out.shape)
-        h1_negative = torch.zeros(M_out.shape)
+        h1_positive = torch.zeros(M_out.shape).to(self.device)
+        h1_negative = torch.zeros(M_out.shape).to(self.device)
         for i in range(len(e)):
             if self.is_pos(e[i]):
                 h1_positive[i] = M_out[i]
@@ -95,7 +94,7 @@ class VAESampling(LightningModule):
         mu_negative = self.mu_posterior_negative(h1_negative)
         logvar_negative = self.logvar_posterior_negative(h1_negative)
 
-        return mu_positive, logvar_positive, mu_negative, logvar_positive
+        return mu_positive, logvar_positive, mu_negative, logvar_negative
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
@@ -113,14 +112,14 @@ class VAESampling(LightningModule):
         z_p = self.reparameterize(mu_p, logvar_p)
         E_prob_p = torch.softmax(
             self.Dense_z_prior_positive(z_p), dim=-1
-        )  # (bs, len(pos))
-        emotions_p = E_prob_p @ emb_layer(self.positive_emotions_t)  # (bs, dim)
+        ).to(self.device)  # (bs, len(pos))
+        emotions_p = E_prob_p @ emb_layer(self.positive_emotions_t.to(self.device))  # (bs, dim)
 
         z_n = self.reparameterize(mu_n, logvar_n)
         E_prob_n = torch.softmax(
             self.Dense_z_prior_negative(z_n), dim=-1
         )  # (bs, len(neg))
-        emotions_n = E_prob_n @ emb_layer(self.negative_emotions_t)
+        emotions_n = E_prob_n @ emb_layer(self.negative_emotions_t.to(self.device))
 
         emotions_mimic = torch.zeros(emotions_n.shape)
         emotions_non_mimic = torch.zeros(emotions_n.shape)
@@ -132,8 +131,8 @@ class VAESampling(LightningModule):
                 emotions_mimic[i] = emotions_n[i]
                 emotions_non_mimic[i] = emotions_p[i]
 
-        emotions_mimic
-        emotions_non_mimic
+        emotions_mimic=emotions_mimic.to(self.device)
+        emotions_non_mimic=emotions_non_mimic.to(self.device)
 
         return emotions_mimic, emotions_non_mimic, mu_p, logvar_p, mu_n, logvar_n
 
@@ -144,13 +143,13 @@ class VAESampling(LightningModule):
         E_prob_p = torch.softmax(
             self.Dense_z_prior_positive(z_p), dim=-1
         )  # (bs, len(pos))
-        emotions_p = E_prob_p @ emb_layer(self.positive_emotions_t)  # (bs, dim)
+        emotions_p = E_prob_p @ emb_layer(self.positive_emotions_t.to(self.device))  # (bs, dim)
 
         z_n = self.reparameterize(mu_n, logvar_n)
         E_prob_n = torch.softmax(
             self.Dense_z_prior_negative(z_n), dim=-1
         )  # (bs, len(neg))
-        emotions_n = E_prob_n @ emb_layer(self.negative_emotions_t)
+        emotions_n = E_prob_n @ emb_layer(self.negative_emotions_t.to(self.device))
 
         emotions_mimic = torch.zeros(emotions_n.shape)
         emotions_non_mimic = torch.zeros(emotions_n.shape)
@@ -161,8 +160,8 @@ class VAESampling(LightningModule):
             else:
                 emotions_mimic[i] = emotions_n[i]
                 emotions_non_mimic[i] = emotions_p[i]
-        # emotions_mimic
-        # emotions_non_mimic
+        emotions_mimic=emotions_mimic.to(self.device)
+        emotions_non_mimic=emotions_non_mimic.to(self.device)
 
         return emotions_mimic, emotions_non_mimic, mu_p, logvar_p, mu_n, logvar_n
 
@@ -183,7 +182,7 @@ class VAESampling(LightningModule):
                 - logvar_posterior
                 + (logvar_posterior.exp() + (mu_posterior - mu_prior).pow(2))
                 / logvar_prior.exp()
-                - one
+                - one.to(logvar_prior.device)
             )
         )
         return kl_div

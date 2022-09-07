@@ -13,7 +13,7 @@
             "justMyCode": true,
             "args": [
                 "--model",
-                "empdg",
+                "mime",
                 "--devices",
                 "0",
                 "--batch_size",

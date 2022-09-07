@@ -1,4 +1,4 @@
-### TAKEN FROM https://github.com/kolloldas/torchnlp
+# TAKEN FROM https://github.com/kolloldas/torchnlp
 
 import torch
 import torch.nn as nn
@@ -15,7 +15,6 @@ from model.common import (
     _gen_timing_signal,
     share_embedding,
     LabelSmoothing,
-    NoamOpt,
     _get_attn_subsequent_mask,
     get_input_from_batch,
     get_output_from_batch,
@@ -24,8 +23,7 @@ from model.common import (
 from sklearn.metrics import accuracy_score
 from util import config
 import random
-import os
-
+from model.translator.moel_translator import Translator
 
 class Encoder(LightningModule):
     """
@@ -76,7 +74,7 @@ class Encoder(LightningModule):
         self.timing_signal = _gen_timing_signal(max_length, hidden_size)
 
         if self.universal:
-            ## for t
+            # for t
             self.position_signal = _gen_timing_signal(num_layers, hidden_size)
 
         params = (
@@ -91,11 +89,13 @@ class Encoder(LightningModule):
             relu_dropout,
         )
 
-        self.embedding_proj = nn.Linear(embedding_size, hidden_size, bias=False)
+        self.embedding_proj = nn.Linear(
+            embedding_size, hidden_size, bias=False)
         if self.universal:
             self.enc = EncoderLayer(*params)
         else:
-            self.enc = nn.ModuleList([EncoderLayer(*params) for _ in range(num_layers)])
+            self.enc = nn.ModuleList([EncoderLayer(*params)
+                                     for _ in range(num_layers)])
 
         self.layer_norm = LayerNorm(hidden_size)
         self.input_dropout = nn.Dropout(input_dropout)
@@ -138,7 +138,8 @@ class Encoder(LightningModule):
                 y = self.layer_norm(x)
         else:
             # Add timing signal
-            x += self.timing_signal[:, : inputs.shape[1], :].type_as(inputs.data)
+            x += self.timing_signal[:,
+                                    : inputs.shape[1], :].type_as(inputs.data)
 
             for i in range(self.num_layers):
                 x = self.enc[i](x, mask)
@@ -217,14 +218,16 @@ class Decoder(LightningModule):
                 *[DecoderLayer(*params) for l in range(num_layers)]
             )
 
-        self.embedding_proj = nn.Linear(embedding_size, hidden_size, bias=False)
+        self.embedding_proj = nn.Linear(
+            embedding_size, hidden_size, bias=False)
         self.layer_norm = LayerNorm(hidden_size)
         self.input_dropout = nn.Dropout(input_dropout)
 
     def forward(self, inputs, encoder_output, mask):
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
-            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)], 0
+            mask_trg + self.mask[:,
+                                 : mask_trg.size(-1), : mask_trg.size(-1)], 0
         )
         # Add input dropout
         x = self.input_dropout(inputs)
@@ -246,7 +249,8 @@ class Decoder(LightningModule):
                 y = self.layer_norm(x)
 
             else:
-                x += self.timing_signal[:, : inputs.shape[1], :].type_as(inputs.data)
+                x += self.timing_signal[:,
+                                        : inputs.shape[1], :].type_as(inputs.data)
                 for l in range(self.num_layers):
                     x += (
                         self.position_signal[:, l, :]
@@ -260,10 +264,12 @@ class Decoder(LightningModule):
                 y = self.layer_norm(x)
         else:
             # Add timing signal
-            x += self.timing_signal[:, : inputs.shape[1], :].type_as(inputs.data)
+            x += self.timing_signal[:,
+                                    : inputs.shape[1], :].type_as(inputs.data)
 
             # Run decoder
-            y, _, attn_dist, _ = self.dec((x, encoder_output, [], (mask_src, dec_mask)))
+            y, _, attn_dist, _ = self.dec(
+                (x, encoder_output, [], (mask_src, dec_mask)))
 
             # Final layer normalization
             y = self.layer_norm(y)
@@ -322,19 +328,25 @@ class MulDecoder(LightningModule):
         )
         if config.basic_learner:
             self.basic = DecoderLayer(*params)
-        self.experts = nn.ModuleList([DecoderLayer(*params) for e in range(expert_num)])
-        self.dec = nn.Sequential(*[DecoderLayer(*params) for l in range(num_layers)])
+        self.experts = nn.ModuleList(
+            [DecoderLayer(*params) for e in range(expert_num)])
+        self.dec = nn.Sequential(*[DecoderLayer(*params)
+                                 for l in range(num_layers)])
 
-        self.embedding_proj = nn.Linear(embedding_size, hidden_size, bias=False)
+        self.embedding_proj = nn.Linear(
+            embedding_size, hidden_size, bias=False)
         self.layer_norm = LayerNorm(hidden_size)
         self.input_dropout = nn.Dropout(input_dropout)
 
     def forward(self, inputs, encoder_output, mask, attention_epxert):
-        attention_epxert.to(self.device)
-        mask.to(self.device)
+        attention_epxert=attention_epxert.to(self.device)
         mask_src, mask_trg = mask
+        mask_src = mask_src.to(self.device)
+        mask_trg = mask_trg.to(self.device)
         dec_mask = torch.gt(
-            mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].to(mask_trg.device), 0
+            mask_trg +
+            self.mask[:, : mask_trg.size(-1),
+                      : mask_trg.size(-1)].to(mask_trg.device), 0
         )
         # Add input dropout
         x = self.input_dropout(inputs)
@@ -374,7 +386,8 @@ class MulDecoder(LightningModule):
         if config.basic_learner:
             x += basic_out
         # Run decoder
-        y, _, attn_dist, _ = self.dec((x, encoder_output, [], (mask_src, dec_mask)))
+        y, _, attn_dist, _ = self.dec(
+            (x, encoder_output, [], (mask_src, dec_mask)))
 
         # Final layer normalization
         y = self.layer_norm(y)
@@ -414,11 +427,11 @@ class Generator(LightningModule):
             attn_dist_ = (1 - alpha) * attn_dist
             enc_batch_extend_vocab_ = torch.cat(
                 [enc_batch_extend_vocab.unsqueeze(1)] * x.size(1), 1
-            )  ## extend for all seq
+            )  # extend for all seq
             if beam_search:
                 enc_batch_extend_vocab_ = torch.cat(
                     [enc_batch_extend_vocab_[0].unsqueeze(0)] * x.size(0), 0
-                )  ## extend for all seq
+                )  # extend for all seq
             logit = torch.log(
                 vocab_dist_.scatter_add(2, enc_batch_extend_vocab_, attn_dist_)
             )
@@ -451,7 +464,7 @@ class MOEL(LightningModule):
             universal=config.universal,
         )
         self.decoder_number = decoder_number
-        ## multiple decoders
+        # multiple decoders
         self.decoder = MulDecoder(
             decoder_number,
             config.emb_dim,
@@ -463,7 +476,8 @@ class MOEL(LightningModule):
             filter_size=config.filter,
         )
 
-        self.decoder_key = nn.Linear(config.hidden_dim, decoder_number, bias=False)
+        self.decoder_key = nn.Linear(
+            config.hidden_dim, decoder_number, bias=False)
 
         self.generator = Generator(config.hidden_dim, self.vocab_size)
         self.emoji_embedding = nn.Linear(64, config.emb_dim, bias=False)
@@ -484,6 +498,8 @@ class MOEL(LightningModule):
         else:
             self.attention_activation = nn.Sigmoid()  # nn.Softmax()
 
+        self.res={}
+        self.gdn={}
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
         # if config.noam:
         #     self.optimizer = NoamOpt(
@@ -506,21 +522,50 @@ class MOEL(LightningModule):
         #     os.makedirs(self.model_dir)
         # self.best_path = ""
 
-    def training_step(self,batch,batch_idx):
-        loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
-        self.log('train_ppl',ppl)
-        self.log('train_loss',loss)
-        self.log('train_bce',bce)
-        self.log('train_acc',acc)
+    def training_step(self, batch, batch_idx):
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+        self.log('train_ppl', ppl)
+        self.log('train_loss', loss)
+        self.log('train_bce', bce)
+        self.log('train_acc', acc)
         return loss
 
-    def validation_step(self,batch,batch_idx):
-        loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
-        self.log('valid_ppl',ppl)
-        self.log('valid_loss',loss)
-        self.log('valid_bce',bce)
-        self.log('valid_acc',acc)
+    def validation_step(self, batch, batch_idx):
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+        self.log('valid_ppl', ppl)
+        self.log('valid_loss', loss)
+        self.log('valid_bce', bce)
+        self.log('valid_acc', acc)
         return loss
+
+    def test_step(self,batch,batch_idx):
+        # loss, ppl, bce, acc, top_preds, comet_res= self.train_one_batch(batch,batch_idx)
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+        file_path=f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        outputs = open(file_path, 'a+', encoding='utf-8')
+        self.log('test_ppl',ppl)
+        self.log('test_loss',loss)
+        self.log('test_bce',bce)
+        self.log('test_acc',acc)
+        sent_g=self.decoder_greedy(batch)
+        t=Translator(self,self.vocab)
+        sent_b = t.beam_search(batch,config.max_dec_step)
+        ref, hyp_g= [], []
+        for i, greedy_sent in enumerate(sent_g):
+                rf = " ".join(batch["target_txt"][i])
+                hyp_g.append(greedy_sent)
+                ref.append(rf)
+                self.res[batch_idx] = greedy_sent.split()
+                self.gdn[batch_idx] = batch["target_txt"][i]  # targets.split()
+                outputs.write(f"Emotion:{batch['program_txt'][i]} \n")
+                outputs.write(f"Context:{[' '.join(s) for s in batch['input_txt'][i]]} \n")
+                # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
+                outputs.write(f"Pred:{greedy_sent} \n")
+                outputs.write(f"Beam:{sent_b[i]} \n")
+                outputs.write(f"Ref:{rf} \n")
+
+        return loss
+
     # def save_model(self, running_avg_ppl, iter):
     #     state = {
     #         "iter": iter,
@@ -552,11 +597,12 @@ class MOEL(LightningModule):
         #     self.optimizer.optimizer.zero_grad()
         # else:
         #     self.optimizer.zero_grad()
-        ## Encode
+        # Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
         emb_mask = self.embedding(batch["mask_input"])
-        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
-        ## Attention over decoder
+        encoder_outputs = self.encoder(
+            self.embedding(enc_batch) + emb_mask, mask_src)
+        # Attention over decoder
         q_h = (
             torch.mean(encoder_outputs, dim=1)
             if config.mean_query
@@ -602,7 +648,7 @@ class MOEL(LightningModule):
             (mask_src, mask_trg),
             attention_parameters,
         )
-        ## compute output dist
+        # compute output dist
         logit = self.generator(
             pre_logit,
             attn_dist,
@@ -611,7 +657,7 @@ class MOEL(LightningModule):
             attn_dist_db=None,
         )
         # logit = F.log_softmax(logit,dim=-1) #fix the name later
-        ## loss: NNL if ptr else Cross entropy
+        # loss: NNL if ptr else Cross entropy
         if train and config.schedule > 10:
             if random.uniform(0, 1) <= (
                 0.0001 + (1 - 0.0001) * math.exp(-1.0 * iter / config.schedule)
@@ -625,20 +671,24 @@ class MOEL(LightningModule):
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"]).to(self.device)
+                logit_prob, torch.LongTensor(
+                    batch["program_label"]).to(self.device)
             )
             loss_bce_program = nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"]).to(self.device)
+                logit_prob, torch.LongTensor(
+                    batch["program_label"]).to(self.device)
             )
         else:
             loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
+                logit_prob, torch.FloatTensor(
+                    batch["target_program"]).to(self.device)
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
+                logit_prob, torch.FloatTensor(
+                    batch["target_program"]).to(self.device)
             )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -684,8 +734,9 @@ class MOEL(LightningModule):
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
         emb_mask = self.embedding(batch["mask_input"])
-        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
-        ## Attention over decoder
+        encoder_outputs = self.encoder(
+            self.embedding(enc_batch) + emb_mask, mask_src)
+        # Attention over decoder
         q_h = (
             torch.mean(encoder_outputs, dim=1)
             if config.mean_query
@@ -698,7 +749,7 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a)
+            mask = torch.Tensor(a).to(self.device)
             logit_prob = mask.scatter_(
                 1, k_max_index.long(), k_max_value
             )
@@ -713,7 +764,7 @@ class MOEL(LightningModule):
             -1
         )  # (batch_size, expert_num, 1, 1)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -748,7 +799,7 @@ class MOEL(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)],
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)],
                 dim=1,
             )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
@@ -777,9 +828,10 @@ class MOEL(LightningModule):
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
         emb_mask = self.embedding(batch["mask_input"])
-        encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
+        encoder_outputs = self.encoder(
+            self.embedding(enc_batch) + emb_mask, mask_src)
 
-        ## Attention over decoder
+        # Attention over decoder
         q_h = (
             torch.mean(encoder_outputs, dim=1)
             if config.mean_query
@@ -862,10 +914,13 @@ class MOEL(LightningModule):
                     st += e + " "
             sent.append(st)
         return sent
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(),lr=config.lr)
 
-### CONVERTED FROM https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py#L1062
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=config.lr)
+
+# CONVERTED FROM https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py#L1062
+
+
 class ACT_basic(LightningModule):
     def __init__(self, hidden_size):
         super(ACT_basic, self).__init__()
@@ -890,7 +945,7 @@ class ACT_basic(LightningModule):
         halting_probability = torch.zeros(inputs.shape[0], inputs.shape[1]).to(
             self.device
         )
-        ## [B, S
+        # [B, S
         remainders = torch.zeros(inputs.shape[0], inputs.shape[1])
         ## [B, S]
         n_updates = torch.zeros(inputs.shape[0], inputs.shape[1])
@@ -905,7 +960,8 @@ class ACT_basic(LightningModule):
             .any()
         ):
             # Add timing signal
-            state = state + time_enc[:, : inputs.shape[1], :].type_as(inputs.data)
+            state = state + time_enc[:,
+                                     : inputs.shape[1], :].type_as(inputs.data)
             state = state + pos_enc[:, step, :].unsqueeze(1).repeat(
                 1, inputs.shape[1], 1
             ).type_as(inputs.data)
@@ -957,13 +1013,13 @@ class ACT_basic(LightningModule):
                 if step == 0:
                     previous_att_weight = torch.zeros_like(attention_weight).to(
                         self.device
-                    )  ## [B, S, src_size]
+                    )  # [B, S, src_size]
                 previous_att_weight = (
                     attention_weight * update_weights.unsqueeze(-1)
                 ) + (previous_att_weight * (1 - update_weights.unsqueeze(-1)))
-            ## previous_state is actually the new_state at end of hte loop
-            ## to save a line I assigned to previous_state so in the next
-            ## iteration is correct. Notice that indeed we return previous_state
+            # previous_state is actually the new_state at end of hte loop
+            # to save a line I assigned to previous_state so in the next
+            # iteration is correct. Notice that indeed we return previous_state
             step += 1
 
         if decoding:

@@ -15,7 +15,7 @@ class Translator(object):
         self.beam_size = config.beam_size
         self.device = self.model.device
 
-    def beam_search(self, src_seq, max_dec_step):
+    def beam_search(self, src_seq, max_dec_step=30):
         """ Translation work in one batch """
 
         def get_inst_idx_to_tensor_position_map(inst_idx_list):

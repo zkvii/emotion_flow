@@ -260,10 +260,10 @@ class Translator(object):
             ]
             context_emo = torch.Tensor(context_emo).to(self.device)
 
-            if config.noam:
-                self.model.optimizer.optimizer.zero_grad()
-            else:
-                self.model.optimizer.zero_grad()
+            # if config.noam:
+                # self.model.optimizer.optimizer.zero_grad()
+            # else:
+                # self.model.optimizer.zero_grad()
             ## Encode
             mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
@@ -443,7 +443,7 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range = torch.arange(0, max_len).long()
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     seq_range_expand = seq_range_expand
-    seq_range_expand.to(sequence_length.device)
+    seq_range_expand=seq_range_expand.to(sequence_length.device)
     seq_length_expand = sequence_length.unsqueeze(1).expand_as(seq_range_expand)
     return seq_range_expand < seq_length_expand
 
@@ -472,10 +472,10 @@ def get_input_from_batch(batch):
         coverage = torch.zeros(enc_batch.size()).to(enc_batch.device)
 
     if enc_batch_extend_vocab is not None:
-        enc_batch_extend_vocab.to(enc_batch.device)
+        enc_batch_extend_vocab= enc_batch_extend_vocab.to(enc_batch.device)
 
     if extra_zeros is not None:
-        extra_zeros.to(enc_batch.device)
+        extra_zeros= extra_zeros.to(enc_batch.device)
 
     return (
         enc_batch,

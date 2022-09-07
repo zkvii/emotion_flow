@@ -401,19 +401,19 @@ class CEM(LightningModule):
             universal=config.universal,
         )
 
-    def save_model(self, running_avg_ppl, iter):
-        state = {
-            "iter": iter,
-            "optimizer": self.optimizer.state_dict(),
-            "current_loss": running_avg_ppl,
-            "model": self.state_dict(),
-        }
-        model_save_path = os.path.join(
-            self.model_dir,
-            "CEM_{}_{:.4f}".format(iter, running_avg_ppl),
-        )
-        self.best_path = model_save_path
-        torch.save(state, model_save_path)
+    # def save_model(self, running_avg_ppl, iter):
+    #     state = {
+    #         "iter": iter,
+    #         "optimizer": self.optimizer.state_dict(),
+    #         "current_loss": running_avg_ppl,
+    #         "model": self.state_dict(),
+    #     }
+    #     model_save_path = os.path.join(
+    #         self.model_dir,
+    #         "CEM_{}_{:.4f}".format(iter, running_avg_ppl),
+    #     )
+    #     self.best_path = model_save_path
+    #     torch.save(state, model_save_path)
 
     def clean_preds(self, preds):
         res = []
@@ -632,7 +632,7 @@ class CEM(LightningModule):
         self.log('test_acc',acc)
         sent_g=self.decoder_greedy(batch)
         t=Translator(self,self.vocab)
-        sent_b = t.beam_search(batch)
+        sent_b = t.beam_search(batch,max_dec_step=config.max_dec_step)
         ref, hyp_g= [], []
         for i, greedy_sent in enumerate(sent_g):
                 rf = " ".join(batch["target_txt"][i])

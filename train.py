@@ -14,11 +14,8 @@ from model.MIME.model import MIME
 from util import config
 from model.litcem import CEM
 from torch.nn.init import xavier_normal_
-import torch.nn as nn
-from torch.utils.data import Dataset
-from pytorch_lightning.callbacks import ModelCheckpoint,Callback
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.core.saving import save_hparams_to_yaml
 import os
 import warnings
 warnings.filterwarnings("ignore")
@@ -137,7 +134,8 @@ def main():
         # model.load_from_checkpoint(checkpoint_path)
         # clear old predicts if need overwrite use date
         file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
 
 
