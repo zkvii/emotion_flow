@@ -27,7 +27,7 @@ from sklearn.metrics import accuracy_score
 from model.translator.transformer_translator import Translator
 
 
-class Encoder(nn.Module):
+class Encoder(LightningModule):
     """
     A Transformer Encoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -150,7 +150,7 @@ class Encoder(nn.Module):
         return y
 
 
-class Decoder(nn.Module):
+class Decoder(LightningModule):
     """
     A Transformer Decoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -279,7 +279,7 @@ class Decoder(nn.Module):
         return y, attn_dist
 
 
-class Generator(nn.Module):
+class Generator(LightningModule):
     "Define standard linear + softmax generation step."
 
     def __init__(self, d_model, vocab):
@@ -666,7 +666,7 @@ class Transformer(LightningModule):
 
 
 # CONVERTED FROM https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py#L1062
-class ACT_basic(nn.Module):
+class ACT_basic(LightningModule):
     def __init__(self, hidden_size):
         super(ACT_basic, self).__init__()
         self.sigma = nn.Sigmoid()
@@ -688,7 +688,7 @@ class ACT_basic(nn.Module):
         # init_hdd
         ## [B, S]
         halting_probability = torch.zeros(inputs.shape[0], inputs.shape[1]).to(
-            config.device
+            self.device
         )
         # [B, S
         remainders = torch.zeros(inputs.shape[0], inputs.shape[1])

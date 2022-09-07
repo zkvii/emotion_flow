@@ -30,10 +30,10 @@ class VAESampling(LightningModule):
             22,
         ]  # anticipation is negative
         self.positive_emotions_t = torch.LongTensor(self.positive_emotions).to(
-            config.device
+            self.device
         )
         self.negative_emotions_t = torch.LongTensor(self.negative_emotions).to(
-            config.device
+            self.device
         )
         # Prior encoding
         self.h_prior = nn.Linear(hidden_dim, hidden_dim)

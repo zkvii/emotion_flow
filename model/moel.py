@@ -27,7 +27,7 @@ import random
 import os
 
 
-class Encoder(nn.Module):
+class Encoder(LightningModule):
     """
     A Transformer Encoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -147,7 +147,7 @@ class Encoder(nn.Module):
         return y
 
 
-class Decoder(nn.Module):
+class Decoder(LightningModule):
     """
     A Transformer Decoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -270,7 +270,7 @@ class Decoder(nn.Module):
         return y, attn_dist
 
 
-class MulDecoder(nn.Module):
+class MulDecoder(LightningModule):
     def __init__(
         self,
         expert_num,
@@ -379,7 +379,7 @@ class MulDecoder(nn.Module):
         return y, attn_dist
 
 
-class Generator(nn.Module):
+class Generator(LightningModule):
     "Define standard linear + softmax generation step."
 
     def __init__(self, d_model, vocab):
@@ -567,7 +567,7 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a)
+            mask = torch.Tensor(a).to(self.device)
             logit_prob_ = mask.scatter_(
                 1, k_max_index.long(), k_max_value
             )
@@ -589,7 +589,7 @@ class MOEL(LightningModule):
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0))
             .unsqueeze(1)
-        )
+        ).to(self.device)
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
         mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
@@ -623,20 +623,20 @@ class MOEL(LightningModule):
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"])
+                logit_prob, torch.LongTensor(batch["program_label"]).to(self.device)
             )
             loss_bce_program = nn.CrossEntropyLoss()(
-                logit_prob, torch.LongTensor(batch["program_label"])
+                logit_prob, torch.LongTensor(batch["program_label"]).to(self.device)
             )
         else:
             loss = self.criterion(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             ) + nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"])
+                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
             )
             loss_bce_program = nn.BCEWithLogitsLoss()(
-                logit_prob, torch.FloatTensor(batch["target_program"])
+                logit_prob, torch.FloatTensor(batch["target_program"]).to(self.device)
             )
         pred_program = np.argmax(logit_prob.detach().cpu().numpy(), axis=1)
         program_acc = accuracy_score(batch["program_label"], pred_program)
@@ -864,7 +864,7 @@ class MOEL(LightningModule):
         return torch.optim.Adam(self.parameters(),lr=config.lr)
 
 ### CONVERTED FROM https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py#L1062
-class ACT_basic(nn.Module):
+class ACT_basic(LightningModule):
     def __init__(self, hidden_size):
         super(ACT_basic, self).__init__()
         self.sigma = nn.Sigmoid()
@@ -886,7 +886,7 @@ class ACT_basic(nn.Module):
         # init_hdd
         ## [B, S]
         halting_probability = torch.zeros(inputs.shape[0], inputs.shape[1]).to(
-            config.device
+            self.device
         )
         ## [B, S
         remainders = torch.zeros(inputs.shape[0], inputs.shape[1])
@@ -954,7 +954,7 @@ class ACT_basic(nn.Module):
             if decoding:
                 if step == 0:
                     previous_att_weight = torch.zeros_like(attention_weight).to(
-                        config.device
+                        self.device
                     )  ## [B, S, src_size]
                 previous_att_weight = (
                     attention_weight * update_weights.unsqueeze(-1)
