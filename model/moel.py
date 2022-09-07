@@ -330,6 +330,8 @@ class MulDecoder(LightningModule):
         self.input_dropout = nn.Dropout(input_dropout)
 
     def forward(self, inputs, encoder_output, mask, attention_epxert):
+        attention_epxert.to(self.device)
+        mask.to(self.device)
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
             mask_trg + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].to(mask_trg.device), 0

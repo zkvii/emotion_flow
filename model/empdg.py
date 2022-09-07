@@ -13,14 +13,12 @@ from model.common import (
     _gen_timing_signal,
     share_embedding,
     LabelSmoothing,
-    NoamOpt,
     get_input_from_batch,
     get_output_from_batch,
     _get_attn_subsequent_mask,
 )
 from util import config
 
-import os
 from sklearn.metrics import accuracy_score
 
 
@@ -327,6 +325,8 @@ class Decoder(LightningModule):
 
     def forward(self, inputs, encoder_output, mask=None):
         mask_src, mask_trg = mask
+        mask_src=mask_src.to(self.device)
+        mask_trg=mask_trg.to(self.device)
         dec_mask = torch.gt(
             mask_trg.bool()
             + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].bool().to(self.device),
@@ -527,6 +527,8 @@ class EMPDG(LightningModule):
             )
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
 
+        self.res={}
+        self.gdn={}
 
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
@@ -744,12 +746,12 @@ class EMPDG(LightningModule):
             next_word = next_word.data[0]
 
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word).cuda()], dim=1
+                [ys.to(self.device), torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1
             )
             ys_emb = torch.cat(
                 (
                     ys_emb,
-                    self.embedding(torch.ones(1, 1).long().fill_(next_word).cuda()),
+                    self.embedding(torch.ones(1, 1).long().fill_(next_word).to(self.device)),
                 ),
                 dim=1,
             )

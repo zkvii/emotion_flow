@@ -94,6 +94,6 @@ def save_best_path(file_path):
 def load_best_path():
     file_name=f'./best_model/{config.model}-{config.emotion_emb_type}.json'
     with open(file_name) as f:
-        model_map=json.loads(f)
+        model_map=json.load(f)
     return model_map['path']
     
