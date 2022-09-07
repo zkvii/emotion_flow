@@ -454,7 +454,7 @@ def prepare_data_seq(batch_size=32):
     pairs_tra, pairs_val, pairs_tst, vocab = load_dataset()
 
     logging.info("Vocab  {} ".format(vocab.n_words))
-    num_workers=8
+    num_workers=1
     dataset_train = Dataset(pairs_tra, vocab)
     data_loader_tra = torch.utils.data.DataLoader(
         dataset=dataset_train,

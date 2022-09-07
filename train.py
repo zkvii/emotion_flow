@@ -22,6 +22,7 @@ from pytorch_lightning.core.saving import save_hparams_to_yaml
 import os
 import warnings
 warnings.filterwarnings("ignore")
+warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
@@ -110,8 +111,9 @@ def main():
     )
     # trainer_test=Trainer(accelerator='gpu',checkpoint_callback=False,logger=False)
     print_opts(config.args)
-    checkpoint_path = f'./em_logs/{config.model}/{config.emotion_emb_type}/checkpoints/{config.model}-{config.emotion_emb_type}.ckpt'
+    # checkpoint_path = f'./em_logs/{config.model}/{config.emotion_emb_type}/checkpoints/{config.model}-{config.emotion_emb_type}.ckpt'
     # trainer.fit(model=model, train_dataloaders=train_loader)
+    checkpoint_path=checkpoint_callback.best_model_path
     if config.mode == 'only_train':
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)

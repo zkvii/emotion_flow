@@ -182,5 +182,4 @@ only_test
 only_test/**
 transformers/
 transformers/**
-predicts
 predicts/**
