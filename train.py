@@ -20,6 +20,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint,Callback
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.core.saving import save_hparams_to_yaml
 import os
+import warnings
+warnings.filterwarnings("ignore")
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 

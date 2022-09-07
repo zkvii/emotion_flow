@@ -11,7 +11,20 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--model","empdg","--devices","1","--batch_size","32","--mode","train_and_test","--emotion_emb_type","origin"]
+            "args": [
+                "--model",
+                "trans",
+                "--devices",
+                "1",
+                "--batch_size",
+                "32",
+                "--mode",
+                "train_and_test",
+                "--max_epoch",
+                "1",
+                "--emotion_emb_type",
+                "origin"
+            ]
         }
     ]
 }
