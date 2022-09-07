@@ -1,7 +1,0 @@
-./predicts/trans-origin-results.txt
-Dist-1	Dist-2
-0.15	0.44
-Bleu1	Bleu2	Bleu4
-17.13	7.31	2.22
-Beam-Blue1	Beam-Blue2	Beam-Blue4
-17.97	7.54	2.45
