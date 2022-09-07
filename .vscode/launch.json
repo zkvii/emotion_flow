@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--model","trans","--devices","0,1","--batch_size","32","--mode","train_and_test","--emotion_emb_type","origin"]
+            "args": ["--model","trans","--devices","0,1,2,3","--batch_size","32","--mode","train_and_test","--emotion_emb_type","origin"]
         }
     ]
 }

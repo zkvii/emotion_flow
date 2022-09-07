@@ -82,7 +82,7 @@ parser.add_argument("--devices", type=str, default='0')
 
 
 args = parser.parse_args()
-print_opts(args)
+# print_opts(args)
 model = args.model
 data_dir = args.data_dir
 large_decoder = args.large_decoder
