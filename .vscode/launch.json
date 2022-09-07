@@ -11,11 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-<<<<<<< HEAD
-            "args": ["--model","cem","--devices","1","--batch_size","32","--mode","only_test","--emotion_emb_type","origin"]
-=======
-            "args": ["--model","trans","--devices","0,1,2,3","--batch_size","32","--mode","train_and_test","--emotion_emb_type","origin"]
->>>>>>> 55d308118a09b18f58b8986de76829f49f2692f7
+            "args": ["--model","empdg","--devices","1","--batch_size","32","--mode","train_and_test","--emotion_emb_type","origin"]
         }
     ]
 }

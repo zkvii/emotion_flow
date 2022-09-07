@@ -24,7 +24,7 @@ import os
 from sklearn.metrics import accuracy_score
 
 
-class Semantic_Encoder(nn.Module):
+class Semantic_Encoder(LightningModule):
     """
     A Transformer Encoder module.
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -140,7 +140,7 @@ class Semantic_Encoder(nn.Module):
         return y
 
 
-class Emotion_Encoder(nn.Module):
+class Emotion_Encoder(LightningModule):
     """
     A Transformer Encoder module.
     """
@@ -253,7 +253,7 @@ class Emotion_Encoder(nn.Module):
         return y
 
 
-class Decoder(nn.Module):
+class Decoder(LightningModule):
     """
     A Transformer Decoder module.
     """
@@ -329,7 +329,7 @@ class Decoder(nn.Module):
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
             mask_trg.bool()
-            + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].bool().to(mask_trg.device),
+            + self.mask[:, : mask_trg.size(-1), : mask_trg.size(-1)].bool().to(self.device),
             0,
         )
         # Add input dropout
@@ -604,7 +604,7 @@ class EMPDG(LightningModule):
                 (emo_encoder_outputs[:, 0, :], sem_encoder_outputs[:, 0, :]), dim=-1
             )
         )  # (bsz, decoder_number)
-        emo_label = torch.LongTensor(batch["program_label"])
+        emo_label = torch.LongTensor(batch["program_label"]).to(self.device)
         loss_emotion = nn.CrossEntropyLoss()(emotion_logit, emo_label)
         pred_emotion = np.argmax(emotion_logit.detach().cpu().numpy(), axis=1)
         emotion_acc = accuracy_score(batch["program_label"], pred_emotion)
