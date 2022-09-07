@@ -15,7 +15,7 @@
                 "--model",
                 "trans",
                 "--devices",
-                "0,1,2,3",
+                "0",
                 "--batch_size",
                 "64",
                 "--mode",

@@ -83,14 +83,16 @@ def print_opts(opts):
             print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
     print("=" * 80)
 
-file_name=f'./best_model/{config.model}-{config.emotion_emb_type}.json'
 
 def save_best_path(file_path):
+    
+    file_name=f'./best_model/{config.model}-{config.emotion_emb_type}.json'
     model_map={'path':file_path}
     with open(file_name,'w+') as f:
         json.dump(model_map,f)
 
 def load_best_path():
+    file_name=f'./best_model/{config.model}-{config.emotion_emb_type}.json'
     with open(file_name) as f:
         model_map=json.loads(f)
     return model_map['path']

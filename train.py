@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
+from util.common import load_best_path,save_best_path
 logger = TensorBoardLogger(
     "em_logs", name=f"{config.model}", version=f'{config.emotion_emb_type}')
 
@@ -113,19 +113,24 @@ def main():
     print_opts(config.args)
     # checkpoint_path = f'./em_logs/{config.model}/{config.emotion_emb_type}/checkpoints/{config.model}-{config.emotion_emb_type}.ckpt'
     # trainer.fit(model=model, train_dataloaders=train_loader)
-    checkpoint_path=checkpoint_callback.best_model_path
     if config.mode == 'only_train':
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)
+
+        checkpoint_path=checkpoint_callback.best_model_path
+        save_best_path(checkpoint_path)
     elif config.mode == 'train_and_test':
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)
         print('--------------------start test---------------------')
+        checkpoint_path=checkpoint_callback.best_model_path
+        save_best_path(checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["state_dict"])
         trainer.test(model=model, dataloaders=test_loader)
     else:
         print('--------------------start test---------------------')
+        checkpoint_path=load_best_path()
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["state_dict"])
         # print(model)
