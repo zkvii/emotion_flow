@@ -1,18 +1,17 @@
 from collections import defaultdict
 import os
-from more_itertools import numeric_range
 import nltk
 import json
-from pip import main
 import torch
 import pickle
 import logging
 import numpy as np
 from tqdm.auto import tqdm
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import torch.utils.data as data
 from nltk.corpus import wordnet, stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from dataloader.concept_preprocess import aug_kemp
 from util.constants import WORD_PAIRS as word_pairs
 from util.constants import EMO_MAP as emo_map
 from util.constants import EMO_MAP_T as emo_map_t
@@ -20,7 +19,7 @@ from util.constants import EMO_MAP_ORIGIN as emo_map_o
 from util.constants import EMO_MAP_RANDOM as emo_map_r
 from util.constants import DATA_FILES
 from util import config
-from util.common import get_wordnet_pos, save_config
+from util.common import get_wordnet_pos
 import os
 import numpy as np
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
@@ -149,7 +148,7 @@ def encode_ctx(vocab, items, data_dict, comet):
 
 
 def encode_context(vocab, items, data_dict, comet):
-    items = items[:1024]
+    # items = items[:1024]
     commonsense_item = []
     for ctx in tqdm(items):
         ctx_list = []
@@ -218,7 +217,8 @@ def encode(vocab, files):
     comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
-        items = files[i][:320]
+        # items = files[i][:320]
+        items = files[i]
         if k == "context":
             # encoding context
 
@@ -270,6 +270,10 @@ def read_files(vocab):
     data_dev = encode(vocab, dev_files)
     data_test = encode(vocab, test_files)
     # return raw data
+    # kemp augmentation
+    # get_concept_dict(vocab)
+    # rank_concept_dict()
+    aug_kemp(data_train,data_dev,data_test,vocab)
     #
     return data_train, data_dev, data_test, vocab
 

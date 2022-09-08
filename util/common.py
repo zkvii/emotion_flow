@@ -5,6 +5,8 @@ import numpy as np
 from util import config
 import yaml
 
+from nltk.corpus import wordnet
+
 def set_seed():
     torch.manual_seed(config.seed)
     torch.backends.cudnn.deterministic = True
