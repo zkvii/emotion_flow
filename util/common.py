@@ -3,7 +3,7 @@ import os
 import torch
 import numpy as np
 from util import config
-
+import yaml
 
 def set_seed():
     torch.manual_seed(config.seed)
@@ -96,4 +96,9 @@ def load_best_path():
     with open(file_name) as f:
         model_map=json.load(f)
     return model_map['path']
-    
+
+def save_best_hparams(model):
+    logger = model.logger
+    file_path=f'{logger.log_dir}/{logger.NAME_HPARAMS_FILE}' 
+    with open(file_path,'w') as f:
+        yaml.dump(vars(config.args),f,default_flow_style=False)

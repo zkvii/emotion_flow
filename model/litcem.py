@@ -342,7 +342,6 @@ class CEM(LightningModule):
         self,
         vocab,
         decoder_number,
-        hp=config.args
     ):  
         super(CEM, self).__init__()
         self.vocab = vocab
@@ -352,7 +351,7 @@ class CEM(LightningModule):
 
         self.rels = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
 
-        self.save_hyperparameters(ignore=['vocab'])
+        # self.save_hyperparameters(ignore=['vocab'])
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
 
         self.encoder = self.make_encoder(config.emb_dim)

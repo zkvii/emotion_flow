@@ -30,12 +30,10 @@ class MIME(LightningModule):
         self,
         vocab,
         decoder_number,
-        args=config.args
     ):
         super().__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
-        self.save_hyperparameters(ignore=['vocab'])
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
 
         self.encoder = Encoder(

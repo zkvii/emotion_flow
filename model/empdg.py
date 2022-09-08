@@ -430,7 +430,6 @@ class EMPDG(LightningModule):
         self,
         vocab,
         decoder_number,
-        hp=config.args
     ):
         """
         :param decoder_number: the number of emotion labels, i.e., 32
@@ -438,7 +437,6 @@ class EMPDG(LightningModule):
         super(EMPDG, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
-        self.save_hyperparameters(ignore=['vocab'])
 
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
         self.semantic_und = Semantic_Encoder(
