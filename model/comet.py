@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
+import numpy as np
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -31,18 +31,49 @@ def use_task_specific_params(model, task):
 
 
 class Comet:
-    def __init__(self, model_path, device=None):
+    def __init__(self, model_path,device='cuda'):
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_path).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.device = device
-        self.batch_size = 1
+        # self.batch_size = 1
 
         # init params
         use_task_specific_params(self.model, "summarization")
         self.model.zero_grad()
+    def generate_f(self,input_events,relations):
+        query=[]
+        for input_event in input_events:
+            for rel in relations:
+                query.append(f'{input_event} {rel} [GEN]')
+        # query = [f"{input_event} {rel} [GEN]" for rel in relations for input_event in input_events]
+        #
+        with torch.no_grad():
+            query = self.tokenizer(
+                query, return_tensors="pt", truncation=True, padding="max_length"
+            ).to(self.device)
+            input_ids, attention_mask = trim_batch(
+                **query, pad_token_id=self.tokenizer.pad_token_id
+            )
+
+            summaries = self.model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                decoder_start_token_id=None,
+                num_beams=5,
+                num_return_sequences=5,
+            )
+            # summaries=summaries.reshape(5,-1)
+            dec = self.tokenizer.batch_decode(
+                summaries,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False,
+            )
+            out=np.reshape(dec,[5,5,-1]).transpose(2,1,0).tolist()
+            return out
+
 
     def generate(self, input_event, rel):
-        query = "{} {} [GEN]".format(input_event, rel)
+        query = f"{input_event} {rel} [GEN]"
 
         with torch.no_grad():
             query = self.tokenizer(

@@ -146,5 +146,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # prepare_data_seq()
-    main()
+    prepare_data_seq()
+    # main()

@@ -10,7 +10,8 @@ SOS_idx = 3
 USR_idx = 4
 SYS_idx = 5
 CLS_idx = 6
-
+CLS_idx = 7
+SEP_idx = 8
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")
@@ -80,6 +81,11 @@ parser.add_argument("--depth", type=int, default=40)
 parser.add_argument("--filter", type=int, default=50)
 parser.add_argument("--devices", type=str, default='0')
 
+# concept
+parser.add_argument("--concept_num", type=int, default=3,
+                    help='the maximum number of external concepts injection for a word.')
+parser.add_argument("--total_concept_num", type=int, default=10,
+                    help='the maximum number of external concepts injection for a sentence.')
 
 args = parser.parse_args()
 # print_opts(args)
@@ -136,7 +142,7 @@ hop = args.hop
 heads = args.heads
 depth = args.depth
 filter = args.filter
-max_dec_step=args.max_dec_step
+max_dec_step = args.max_dec_step
 
 label_smoothing = args.label_smoothing
 weight_sharing = args.weight_sharing
@@ -144,7 +150,9 @@ noam = args.noam
 universal = args.universal
 act = args.act
 act_loss_weight = args.act_loss_weight
-
+# kemp
+total_concept_num = args.total_concept_num
+concept_num = args.concept_num
 # Ablation
 woEMO = args.woEMO
 woCOG = args.woCOG

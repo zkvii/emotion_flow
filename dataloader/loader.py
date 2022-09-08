@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 from more_itertools import numeric_range
 import nltk
@@ -8,6 +9,7 @@ import pickle
 import logging
 import numpy as np
 from tqdm.auto import tqdm
+from torch.utils.data import Dataset, DataLoader
 import torch.utils.data as data
 from nltk.corpus import wordnet, stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -20,7 +22,7 @@ from util.constants import DATA_FILES
 from util import config
 from util.common import save_config
 import os
-
+import numpy as np
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
 emotion_lexicon = json.load(open("data/NRCDict.json"))[0]
 stop_words = stopwords.words("english")
@@ -93,44 +95,99 @@ def process_sent(sentence):
     return sentence
 
 
-def get_commonsense(comet, item, data_dict):
-    #get common sense by different relations
+def get_commonsense(comet, items):
+    # item:List[32List[]]
+    # get common sense by different relations
     cs_list = []
-    input_event = " ".join(item)
-    for rel in relations:
-        cs_res = comet.generate(input_event, rel)
-        cs_res = [process_sent(item) for item in cs_res]
-        cs_list.append(cs_res)
+    input_events = [" ".join(item) for item in items]
+    # cs_old=[]
+    # for rel in relations:
+    #     cs_res = comet.generate(input_event, rel)
+    #     cs_res = [process_sent(item) for item in cs_res]
+    #     cs_old.append(cs_res)
+    cs_list = comet.generate_f(input_events, relations)
+    # cs_list=
+    # data_dict["utt_cs"].append(cs_list)
+    return cs_list
 
-    data_dict["utt_cs"].append(cs_list)
+# to use batch accelerate gen commonsense corpus
 
 
 def encode_ctx(vocab, items, data_dict, comet):
-    #ctx is turns of dialogue
+    # ctx is turns of dialogue
     print(f'start context encoding')
+    print(f'using large size i.e. 32')
     for ctx in tqdm(items):
         ctx_list = []
         e_list = []
+        commonsense_list = []
         for i, c in enumerate(ctx):
-            #item is sentence word list
+            # item is sentence word list
             item = process_sent(c)
-            
             ctx_list.append(item)
+            # make vocab
             vocab.index_words(item)
+            # tag word in sentence
             ws_pos = nltk.pos_tag(item)  # pos
             for w in ws_pos:
                 w_p = get_wordnet_pos(w[1])
                 if w[0] not in stop_words and (
                     w_p == wordnet.ADJ or w[0] in emotion_lexicon
                 ):
-                    #word that is not a stop word and marked as adjective or in emotion_lexicon will be added to e_list
+                    # word that is not a stop word and marked as adjective or in emotion_lexicon will be added to e_list
                     e_list.append(w[0])
+            # only gen last one
             if i == len(ctx) - 1:
-                get_commonsense(comet, item, data_dict)
-        #raw context list 
+                # commonsense_list = get_commonsense(comet, item, data_dict)
+                commonsense_list = get_commonsense(comet, item)
+        # raw context list
+        #commonsense_list : List[5*RelationList[n*GenElement]]
+        data_dict["utt_cs"].append(commonsense_list)
         data_dict["context"].append(ctx_list)
-        #emotion word list list
+        # emotion word list list
         data_dict["emotion_context"].append(e_list)
+
+
+def encode_context(vocab, items, data_dict, comet):
+    # items = items[:1024]
+    commonsense_item = []
+    for ctx in tqdm(items):
+        ctx_list = []
+        e_list = []
+        # commonsense_list=[]
+        for i, c in enumerate(ctx):
+            # item is sentence word list
+            item = process_sent(c)
+            ctx_list.append(item)
+            # make vocab
+            vocab.index_words(item)
+            # tag word in sentence
+            ws_pos = nltk.pos_tag(item)  # pos
+            for w in ws_pos:
+                w_p = get_wordnet_pos(w[1])
+                if w[0] not in stop_words and (
+                    w_p == wordnet.ADJ or w[0] in emotion_lexicon
+                ):
+                    # word that is not a stop word and marked as adjective or in emotion_lexicon will be added to e_list
+                    e_list.append(w[0])
+            # only gen last one
+            if i == len(ctx) - 1:
+                commonsense_item.append(item)
+                # commonsense_list = get_commonsense(comet, item, data_dict)
+                # commonsense_list = get_commonsense(comet, item)
+        # raw context list
+        #commonsense_list : List[5*RelationList[n*GenElement]]
+        # data_dict["utt_cs"].append(commonsense_list)
+        data_dict["context"].append(ctx_list)
+        # emotion word list list
+        data_dict["emotion_context"].append(e_list)
+    # batch_items=np.reshape(commonsense_item,[])
+
+    for context in tqdm(range(0, len(commonsense_item), 32)):
+        chunks = commonsense_item[context:context+32]
+        chunks_gen = get_commonsense(comet, chunks)
+        data_dict["utt_cs"].extend(chunks_gen)
+    return data_dict
 
 
 def encode(vocab, files):
@@ -161,13 +218,18 @@ def encode(vocab, files):
     comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
-        items = files[i]
+        items = files[i][:320]
         if k == "context":
             # encoding context
-            encode_ctx(vocab, items, data_dict, comet)
+
+            # using comet model to gen commonsense data
+            # encode_ctx(vocab, items, data_dict, comet)
+            encode_context(vocab, items, data_dict, comet)
         elif k == "emotion":
             data_dict[k] = items
         else:
+            # sentence field process
+            # just replace unofficial expression
             for item in tqdm(items):
                 item = process_sent(item)
                 data_dict[k].append(item)
@@ -199,16 +261,21 @@ def read_files(vocab):
     tuple(list,list,list)
     """
     files = DATA_FILES(config.data_dir)
-    # list[dialog,target,emotion,situation] 4elements array
+    # list[dialog,target,emotion,situation] 4 elements array
     train_files = [np.load(f, allow_pickle=True) for f in files["train"]]
     dev_files = [np.load(f, allow_pickle=True) for f in files["dev"]]
     test_files = [np.load(f, allow_pickle=True) for f in files["test"]]
-
+    # data augmentation
     data_train = encode(vocab, train_files)
     data_dev = encode(vocab, dev_files)
     data_test = encode(vocab, test_files)
-
+    # return raw data
+    #
     return data_train, data_dev, data_test, vocab
+
+
+def flatten(t):
+    return [item for sublist in t for item in sublist]
 
 
 def load_dataset():
@@ -229,6 +296,7 @@ def load_dataset():
             [data_tra, data_val, data_tst, vocab] = pickle.load(f)
     else:
         print("Building dataset...")
+        # not just readfiles but with some modification
         data_tra, data_val, data_tst, vocab = read_files(
             vocab=Lang(
                 {
@@ -250,8 +318,11 @@ def load_dataset():
         print("[situation]:", " ".join(data_tra["situation"][i]))
         print("[emotion]:", data_tra["emotion"][i])
         print("[context]:", [" ".join(u) for u in data_tra["context"][i]])
+        print('[concept of context]:')
+        for si, sc in enumerate(data_tra['concepts'][i]):
+            print('concept of sentence {} : {}'.format(si, flatten(sc[0])))
         print("[target]:", " ".join(data_tra["target"][i]))
-        print("[emotion_context]:,"," ".join(data_tra["emotion_context"][i]))
+        print("[emotion_context]:,", " ".join(data_tra["emotion_context"][i]))
         print(" ")
     return data_tra, data_val, data_tst, vocab
 
@@ -269,7 +340,7 @@ class Dataset(data.Dataset):
             self.emo_map = emo_map_t
         elif config.emotion_emb_type == 'origin':
             self.emo_map = emo_map_o
-        else :
+        else:
             self.emo_map = emo_map_r
         self.analyzer = SentimentIntensityAnalyzer()
 
@@ -279,17 +350,19 @@ class Dataset(data.Dataset):
     def __getitem__(self, index):
         """Returns one data pair (source and target)."""
         item = {}
+        # 5 basic elements
         item["context_text"] = self.data["context"][index]
         item["situation_text"] = self.data["situation"][index]
         item["target_text"] = self.data["target"][index]
         item["emotion_text"] = self.data["emotion"][index]
         item["emotion_context"] = self.data["emotion_context"][index]
-
+        # context emo score
         item["context_emotion_scores"] = self.analyzer.polarity_scores(
             " ".join(self.data["context"][index][0])
         )
 
-        item["context"], item["context_mask"] = self.preprocess(item["context_text"])
+        item["context"], item["context_mask"] = self.preprocess(
+            item["context_text"])
         item["target"] = self.preprocess(item["target_text"], anw=True)
         item["emotion"], item["emotion_label"] = self.preprocess_emo(
             item["emotion_text"], self.emo_map
@@ -313,23 +386,26 @@ class Dataset(data.Dataset):
         item["x_effect"] = self.preprocess(item["x_effect_txt"], cs=True)
         item["x_react"] = self.preprocess(item["x_react_txt"], cs="react")
 
-        ##kemp data
-        inputs = self.preprocess_kemp([self.data["context"][index],
+        # kemp data
+        inputs = self.preprocess([self.data["context"][index],
                                   self.data["vads"][index],
                                   self.data["vad"][index],
-                                  self.data["concepts"][index]])
+                                  self.data["concepts"][index]], kemp=True)
         item["kemp_context"], item["context_ext"], item["context_mask"], item["vads"], item["vad"], \
-        item["concept_text"], item["concept"], item["concept_ext"], item["concept_vads"], item["concept_vad"], \
-        item["oovs"]= inputs
-        item["target_kemp"] = self.preprocess(item["target_text"], anw=True)
-        item["target_ext"] = self.target_oovs(item["target_text"], item["oovs"])
+            item["concept_text"], item["concept"], item["concept_ext"], item["concept_vads"], item["concept_vad"], \
+            item["oovs"] = inputs
+        # which is the same as prior
+        # item["target_kemp"] = self.preprocess(item["target_text"], anw=True)
+        item["target_ext"] = self.target_oovs(
+            item["target_text"], item["oovs"])
         item["emotion"], item["emotion_label"] = self.preprocess_emo(item["emotion_text"],
                                                                      self.emo_map)  # one-hot and scalor label
-        item["emotion_widx"] = self.word2index[item["emotion_text"]]
+        item["emotion_widx"] = self.vocab.word2index[item["emotion_text"]]
         return item
 
-    def preprocess(self, arr, anw=False, cs=None, emo=False):
+    def preprocess(self, arr, anw=False, cs=None, emo=False, kemp=False):
         """Converts words to ids."""
+        # normal convert
         if anw:
             sequence = [
                 self.vocab.word2index[word]
@@ -339,6 +415,7 @@ class Dataset(data.Dataset):
             ] + [config.EOS_idx]
 
             return torch.LongTensor(sequence)
+        # convert commensense field
         elif cs:
             sequence = [config.CLS_idx] if cs != "react" else []
             for sent in arr:
@@ -349,6 +426,7 @@ class Dataset(data.Dataset):
                 ]
 
             return torch.LongTensor(sequence)
+        # convert emotion field
         elif emo:
             x_emo = [config.CLS_idx]
             x_emo_mask = [config.CLS_idx]
@@ -362,7 +440,76 @@ class Dataset(data.Dataset):
 
             assert len(x_emo) == len(x_emo_mask)
             return torch.LongTensor(x_emo), torch.LongTensor(x_emo_mask)
+        # convert kemp field
+        elif kemp:
+            context = arr[0]
+            context_vads = arr[1]
+            context_vad = arr[2]
+            concept = [arr[3][l][0] for l in range(len(arr[3]))]
+            concept_vads = [arr[3][l][1] for l in range(len(arr[3]))]
+            concept_vad = [arr[3][l][2] for l in range(len(arr[3]))]
 
+            X_dial = [self.args.CLS_idx]
+            X_dial_ext = [self.args.CLS_idx]
+            X_mask = [self.args.CLS_idx]  # for dialogue state
+            X_vads = [[0.5, 0.0, 0.5]]
+            X_vad = [0.0]
+
+            X_concept_text = defaultdict(list)
+            X_concept = [[]]  # 初始值是cls token
+            X_concept_ext = [[]]
+            X_concept_vads = [[0.5, 0.0, 0.5]]
+            X_concept_vad = [0.0]
+            assert len(context) == len(concept)
+
+            X_ext, X_oovs = self.process_oov(context, concept)
+            X_dial_ext += X_ext
+
+            for i, sentence in enumerate(context):
+                X_dial += [self.vocab.word2index[word]
+                           if word in self.vocab.word2index else self.args.UNK_idx for word in sentence]
+                spk = self.vocab.word2index["[USR]"] if i % 2 == 0 else self.vocab.word2index["[SYS]"]
+                X_mask += [spk for _ in range(len(sentence))]
+                X_vads += context_vads[i]
+                X_vad += context_vad[i]
+
+                for j, token_conlist in enumerate(concept[i]):
+                    if token_conlist == []:
+                        X_concept.append([])
+                        X_concept_ext.append([])
+                        X_concept_vads.append([0.5, 0.0, 0.5])  # ??
+                        X_concept_vad.append(0.0)
+                    else:
+                        X_concept_text[sentence[j]
+                                       ] += token_conlist[:self.args.concept_num]
+                        X_concept.append(
+                            [self.vocab.word2index[con_word] if con_word in self.vocab.word2index else self.args.UNK_idx for con_word in token_conlist[:self.args.concept_num]])
+
+                        con_ext = []
+                        for con_word in token_conlist[:self.args.concept_num]:
+                            if con_word in self.vocab.word2index:
+                                con_ext.append(self.vocab.word2index[con_word])
+                            else:
+                                if con_word in X_oovs:
+                                    con_ext.append(X_oovs.index(
+                                        con_word) + len(self.vocab.word2index))
+                                else:
+                                    con_ext.append(self.args.UNK_idx)
+                        X_concept_ext.append(con_ext)
+                        X_concept_vads.append(
+                            concept_vads[i][j][:self.args.concept_num])
+                        X_concept_vad.append(
+                            concept_vad[i][j][:self.args.concept_num])
+
+                        assert len([self.vocab.word2index[con_word] if con_word in self.vocab.word2index else self.args.UNK_idx for con_word in token_conlist[:self.args.concept_num]]) == len(
+                            concept_vads[i][j][:self.args.concept_num]) == len(concept_vad[i][j][:self.args.concept_num])
+            assert len(X_dial) == len(X_mask) == len(
+                X_concept) == len(X_concept_vad) == len(X_concept_vads)
+
+            return X_dial, X_dial_ext, X_mask, X_vads, X_vad, \
+                X_concept_text, X_concept, X_concept_ext, X_concept_vads, X_concept_vad, \
+                X_oovs
+        # undefined
         else:
             x_dial = [config.CLS_idx]
             x_mask = [config.CLS_idx]
@@ -384,6 +531,9 @@ class Dataset(data.Dataset):
             return torch.LongTensor(x_dial), torch.LongTensor(x_mask)
 
     def preprocess_emo(self, emotion, emo_map):
+        '''
+            one-hot encode
+        '''
         program = [0] * len(emo_map)
         program[emo_map[emotion]] = 1
         return program, emo_map[emotion]
@@ -406,28 +556,199 @@ def collate_fn(data):
         lengths = [len(seq) for seq in sequences]
         padded_seqs = torch.ones(
             len(sequences), max(lengths)
-        ).long()  ## padding to max_sentence with 1
+        ).long()  # padding to max_sentence with 1
         for i, seq in enumerate(sequences):
             end = lengths[i]
             padded_seqs[i, :end] = seq[:end]
         return padded_seqs, lengths
 
-    data.sort(key=lambda x: len(x["context"]), reverse=True)  ## sort by source seq
+    def merge_concept(samples, samples_ext, samples_vads, samples_vad):
+        concept_lengths = []  # 每个sample的concepts数目
+        token_concept_lengths = []  # 每个sample的每个token的concepts数目
+        concepts_list = []
+        concepts_ext_list = []
+        concepts_vads_list = []
+        concepts_vad_list = []
+
+        for i, sample in enumerate(samples):
+            length = 0  # 记录当前样本总共有多少个concept，
+            sample_concepts = []
+            sample_concepts_ext = []
+            token_length = []
+            vads = []
+            vad = []
+
+            for c, token in enumerate(sample):
+                if token == []:  # 这个token没有concept
+                    token_length.append(0)
+                    continue
+                length += len(token)
+                token_length.append(len(token))
+                sample_concepts += token
+                sample_concepts_ext += samples_ext[i][c]
+                vads += samples_vads[i][c]
+                vad += samples_vad[i][c]
+
+            if length > config.total_concept_num:
+                value, rank = torch.topk(torch.LongTensor(
+                    vad), k=config.total_concept_num)
+
+                new_length = 1
+                new_sample_concepts = [config.SEP_idx]  # for each sample
+                new_sample_concepts_ext = [config.SEP_idx]
+                new_token_length = []
+                new_vads = [[0.5, 0.0, 0.5]]
+                new_vad = [0.0]
+
+                cur_idx = 0
+                for ti, token in enumerate(sample):
+                    if token == []:
+                        new_token_length.append(0)
+                        continue
+                    top_length = 0
+                    for ci, con in enumerate(token):
+                        point_idx = cur_idx + ci
+                        if point_idx in rank:
+                            top_length += 1
+                            new_length += 1
+                            new_sample_concepts.append(con)
+                            new_sample_concepts_ext.append(
+                                samples_ext[i][ti][ci])
+                            new_vads.append(samples_vads[i][ti][ci])
+                            new_vad.append(samples_vad[i][ti][ci])
+                            assert len(samples_vads[i][ti][ci]) == 3
+
+                    new_token_length.append(top_length)
+                    cur_idx += len(token)
+
+                new_length += 1  # for sep token
+                new_sample_concepts = [config.SEP_idx] + new_sample_concepts
+                new_sample_concepts_ext = [
+                    config.SEP_idx] + new_sample_concepts_ext
+                new_vads = [[0.5, 0.0, 0.5]] + new_vads
+                new_vad = [0.0] + new_vad
+
+                # the number of concepts including SEP
+                concept_lengths.append(new_length)
+                # the number of tokens which have concepts
+                token_concept_lengths.append(new_token_length)
+                concepts_list.append(new_sample_concepts)
+                concepts_ext_list.append(new_sample_concepts_ext)
+                concepts_vads_list.append(new_vads)
+                concepts_vad_list.append(new_vad)
+                assert len(new_sample_concepts) == len(new_vads) == len(new_vad) == len(
+                    new_sample_concepts_ext), "The number of concept tokens, vads [*,*,*], and vad * should be the same."
+                assert len(new_token_length) == len(token_length)
+            else:
+                length += 1
+                sample_concepts = [config.SEP_idx] + sample_concepts
+                sample_concepts_ext = [config.SEP_idx] + sample_concepts_ext
+                vads = [[0.5, 0.0, 0.5]] + vads
+                vad = [0.0] + vad
+
+                concept_lengths.append(length)
+                token_concept_lengths.append(token_length)
+                concepts_list.append(sample_concepts)
+                concepts_ext_list.append(sample_concepts_ext)
+                concepts_vads_list.append(vads)
+                concepts_vad_list.append(vad)
+
+        if max(concept_lengths) != 0:
+            # padding index 1 (bsz, max_concept_len); add 1 for root
+            padded_concepts = torch.ones(
+                len(samples), max(concept_lengths)).long()
+            # padding index 1 (bsz, max_concept_len)
+            padded_concepts_ext = torch.ones(
+                len(samples), max(concept_lengths)).long()
+            padded_concepts_vads = torch.FloatTensor([[[0.5, 0.0, 0.5]]]).repeat(
+                len(samples), max(concept_lengths), 1)  # padding index 1 (bsz, max_concept_len)
+            padded_concepts_vad = torch.FloatTensor([[0.0]]).repeat(
+                len(samples), max(concept_lengths))  # padding index 1 (bsz, max_concept_len)
+            padded_mask = torch.ones(len(samples), max(
+                concept_lengths)).long()  # concept(dialogue) state
+
+            for j, concepts in enumerate(concepts_list):
+                end = concept_lengths[j]
+                if end == 0:
+                    continue
+                padded_concepts[j, :end] = torch.LongTensor(concepts[:end])
+                padded_concepts_ext[j, :end] = torch.LongTensor(
+                    concepts_ext_list[j][:end])
+                padded_concepts_vads[j, :end, :] = torch.FloatTensor(
+                    concepts_vads_list[j][:end])
+                padded_concepts_vad[j, :end] = torch.FloatTensor(
+                    concepts_vad_list[j][:end])
+                padded_mask[j, :end] = config.KG_idx  # for DIALOGUE STATE
+
+            return padded_concepts, padded_concepts_ext, concept_lengths, padded_mask, token_concept_lengths, padded_concepts_vads, padded_concepts_vad
+        else:  # there is no concept in this mini-batch
+            return torch.Tensor([]), torch.LongTensor([]), torch.LongTensor([]), torch.BoolTensor([]), torch.LongTensor([]), torch.Tensor([]), torch.Tensor([])
+
+    def merge_vad(vads_sequences, vad_sequences):  # for context
+        lengths = [len(seq) for seq in vad_sequences]
+        padding_vads = torch.FloatTensor([[[0.5, 0.0, 0.5]]]).repeat(
+            len(vads_sequences), max(lengths), 1)
+        padding_vad = torch.FloatTensor([[0.5]]).repeat(
+            len(vads_sequences), max(lengths))
+
+        for i, vads in enumerate(vads_sequences):
+            end = lengths[i]  # the length of context
+            padding_vads[i, :end, :] = torch.FloatTensor(vads[:end])
+            padding_vad[i, :end] = torch.FloatTensor(vad_sequences[i][:end])
+        # (bsz, max_context_len, 3); (bsz, max_context_len)
+        return padding_vads, padding_vad
+
+    def adj_mask(context, context_lengths, concepts, token_concept_lengths):
+        '''
+
+        :param self:
+        :param context: (bsz, max_context_len)
+        :param context_lengths: [] len=bsz
+        :param concepts: (bsz, max_concept_len)
+        :param token_concept_lengths: [] len=bsz;
+        :return:
+        '''
+        bsz, max_context_len = context.size()
+        max_concept_len = concepts.size(1)  # include sep token
+        adjacency_size = max_context_len + max_concept_len
+        # todo padding index 1, 1=True
+        adjacency = torch.ones(bsz, max_context_len, adjacency_size)
+
+        for i in range(bsz):
+            # ROOT -> TOKEN
+            adjacency[i, 0, :context_lengths[i]] = 0
+            adjacency[i, :context_lengths[i], 0] = 0
+
+            con_idx = max_context_len+1       # add 1 because of sep token
+            for j in range(context_lengths[i]):
+                adjacency[i, j, j - 1] = 0  # TOEKN_j -> TOKEN_j-1
+
+                token_concepts_length = token_concept_lengths[i][j]
+                if token_concepts_length == 0:
+                    continue
+                else:
+                    adjacency[i, j, con_idx:con_idx+token_concepts_length] = 0
+                    adjacency[i, 0, con_idx:con_idx+token_concepts_length] = 0
+                    con_idx += token_concepts_length
+        return adjacency
+
+    data.sort(key=lambda x: len(x["context"]),
+              reverse=True)  # sort by source seq
     item_info = {}
     for key in data[0].keys():
         item_info[key] = [d[key] for d in data]
 
-    ## input
+    # input
     input_batch, input_lengths = merge(item_info["context"])
     mask_input, mask_input_lengths = merge(item_info["context_mask"])
     emotion_batch, emotion_lengths = merge(item_info["emotion_context"])
 
-    ## Target
+    # Target
     target_batch, target_lengths = merge(item_info["target"])
 
-    input_batch = input_batch
-    mask_input = mask_input
-    target_batch = target_batch
+    # input_batch = input_batch
+    # mask_input = mask_input
+    # target_batch = target_batch
 
     d = {}
     d["input_batch"] = input_batch
@@ -437,11 +758,11 @@ def collate_fn(data):
     d["target_lengths"] = torch.LongTensor(target_lengths)
     d["emotion_context_batch"] = emotion_batch
 
-    ##program
+    # program
     d["target_program"] = item_info["emotion"]
     d["program_label"] = item_info["emotion_label"]
 
-    ##text
+    # text
     d["input_txt"] = item_info["context_text"]
     d["target_txt"] = item_info["target_text"]
     d["program_txt"] = item_info["emotion_text"]
@@ -457,7 +778,7 @@ def collate_fn(data):
         d[f"{r}_txt"] = item_info[f"{r}_txt"]
     # for k in d:
         # if type(d[k]) is torch.Tensor:
-            # d[k] = d[k].detach()
+        # d[k] = d[k].detach()
 
     return d
 
@@ -465,9 +786,10 @@ def collate_fn(data):
 def prepare_data_seq(batch_size=32):
 
     pairs_tra, pairs_val, pairs_tst, vocab = load_dataset()
-
+    # word2index, word2count, index2word, n_words = vocab
     logging.info("Vocab  {} ".format(vocab.n_words))
-    num_workers=1
+
+    num_workers = 1
     dataset_train = Dataset(pairs_tra, vocab)
     data_loader_tra = torch.utils.data.DataLoader(
         dataset=dataset_train,
@@ -499,8 +821,9 @@ def prepare_data_seq(batch_size=32):
         len(dataset_train.emo_map),
     )
 
+
 if __name__ == '__main__':
-    train_loader,val_loader,test_loader,vocab,emotion_len=prepare_data_seq(16)
-    sample_batch=next(iter(train_loader))
+    train_loader, val_loader, test_loader, vocab, emotion_len = prepare_data_seq(
+        16)
+    sample_batch = next(iter(train_loader))
     print('hello')
-    
