@@ -119,7 +119,6 @@ def main():
     if config.mode == 'only_train':
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)
-
         checkpoint_path=checkpoint_callback.best_model_path
         save_best_path(checkpoint_path)
         save_best_hparams(model)

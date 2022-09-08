@@ -5,6 +5,7 @@ import json
 import numpy as np
 from nltk.stem import WordNetLemmatizer
 import nltk
+from tqdm import tqdm
 from util.common import get_wordnet_pos
 wnl = WordNetLemmatizer()
 
@@ -146,7 +147,7 @@ def load_concept(dataset, VAD, concept, concept_num, vocab):
 
     word2index = vocab.word2index
     train_contexts = dataset['context']
-    for i, sample in enumerate(train_contexts):
+    for i, sample in tqdm(enumerate(train_contexts)):
         vads = []  # each item is sentence, each sentence contains a list word' vad vectors
         vad = []
         concepts = []  # concepts of each sample

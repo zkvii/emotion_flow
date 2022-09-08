@@ -369,7 +369,7 @@ class KEMP(LightningModule):
         new_context = torch.cat((new_context, concept), dim=1)
         return new_context
 
-    def train_one_batch(self, batch):
+    def train_one_batch(self, batch,batch_idx):
         enc_batch = batch["context_batch"]
         enc_batch_extend_vocab = batch["context_ext_batch"]
         enc_vad_batch = batch['context_vad']

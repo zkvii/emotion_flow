@@ -9,7 +9,7 @@ import torch.utils.data as data
 from nltk.corpus import stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from dataloader.concept_preprocess import aug_kemp
-from util.constants import WORD_PAIRS as word_pairs
+from util.constants import EMO_MAP_ORIGIN, WORD_PAIRS as word_pairs
 from util.constants import EMO_MAP as emo_map
 from util.constants import EMO_MAP_T as emo_map_t
 from util.constants import EMO_MAP_ORIGIN as emo_map_o
@@ -46,31 +46,6 @@ class Lang:
             self.n_words += 1
         else:
             self.word2count[word] += 1
-
-
-# def get_wordnet_pos(tag):
-#     """replace word tag with word net mark
-
-#     Parameters
-#     ----------
-#     tag : _type_
-#         _description_
-
-#     Returns
-#     -------
-#     _type_
-#         _description_
-#     """
-#     if tag.startswith("J"):
-#         return wordnet.ADJ
-#     elif tag.startswith("V"):
-#         return wordnet.VERB
-#     elif tag.startswith("N"):
-#         return wordnet.NOUN
-#     elif tag.startswith("R"):
-#         return wordnet.ADV
-#     else:
-#         return None
 
 
 def process_sent(sentence):
@@ -217,7 +192,7 @@ def encode(vocab, files):
     comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
-        items = files[i][:320]
+        items = files[i][:100]
         # items = files[i]
         if k == "context":
             # encoding context
@@ -300,20 +275,25 @@ def load_dataset():
             [data_tra, data_val, data_tst, vocab] = pickle.load(f)
     else:
         print("Building dataset...")
+
+        vocab = Lang(
+            {
+                config.UNK_idx: "<UNK>",
+                config.PAD_idx: "<PAD>",
+                config.EOS_idx: "<EOS>",
+                config.SOS_idx: "<SOS>",
+                config.USR_idx: "<USR>",
+                config.SYS_idx: "<SYS>",
+                config.KG_idx: "<KG>",
+                config.CLS_idx: "<CLS>",
+                config.SEP_idx: "<SEP>",
+            }
+        )
+        emos=[k for k in EMO_MAP_ORIGIN]
+        vocab.index_words(emos)
         # not just readfiles but with some modification
         data_tra, data_val, data_tst, vocab = read_files(
-            vocab=Lang(
-                {
-                    config.UNK_idx: "<UNK>",
-                    config.PAD_idx: "<PAD>",
-                    config.EOS_idx: "<EOS>",
-                    config.SOS_idx: "<SOS>",
-                    config.USR_idx: "<USR>",
-                    config.SYS_idx: "<SYS>",
-                    config.CLS_idx: "<CLS>",
-                    config.SEP_idx: "<SEP>",
-                }
-            )
+            vocab
         )
         with open(cache_file, "wb") as f:
             pickle.dump([data_tra, data_val, data_tst, vocab], f)
@@ -408,6 +388,19 @@ class Dataset(data.Dataset):
         item["emotion_widx"] = self.vocab.word2index[item["emotion_text"]]
         return item
 
+    def target_oovs(self, target, oovs):
+        ids = []
+        for w in target:
+            if w not in self.vocab.word2index:
+                if w in oovs:
+                    ids.append(len(self.vocab.word2index) + oovs.index(w))
+                else:
+                    ids.append(config.UNK_idx)
+            else:
+                ids.append(self.vocab.word2index[w])
+        ids.append(config.EOS_idx)
+        return torch.LongTensor(ids)
+
     def process_oov(self, context, concept):  #
         ids = []
         oovs = []
@@ -494,7 +487,7 @@ class Dataset(data.Dataset):
             for i, sentence in enumerate(context):
                 X_dial += [self.vocab.word2index[word]
                            if word in self.vocab.word2index else config.UNK_idx for word in sentence]
-                spk = self.vocab.word2index["<USR>"] if i % 2 == 0 else self.vocab.word2index["[SYS]"]
+                spk = self.vocab.word2index["<USR>"] if i % 2 == 0 else self.vocab.word2index["<SYS>"]
                 X_mask += [spk for _ in range(len(sentence))]
                 X_vads += context_vads[i]
                 X_vad += context_vad[i]
@@ -585,7 +578,7 @@ def collate_fn(data):
         ).long()  # padding to max_sentence with 1
         for i, seq in enumerate(sequences):
             end = lengths[i]
-            padded_seqs[i, :end] = seq[:end]
+            padded_seqs[i, :end] = torch.LongTensor(seq[:end])
         return padded_seqs, lengths
 
     def merge_concept(samples, samples_ext, samples_vads, samples_vad):
@@ -763,15 +756,33 @@ def collate_fn(data):
     item_info = {}
     for key in data[0].keys():
         item_info[key] = [d[key] for d in data]
-
+    # assert len(item_info['context']) == len(item_info['vad'])
     # input
     input_batch, input_lengths = merge(item_info["context"])
+    context_ext_batch, _ = merge(item_info['context_ext'])
     mask_input, mask_input_lengths = merge(item_info["context_mask"])
     emotion_batch, emotion_lengths = merge(item_info["emotion_context"])
+    # dialogue context vad
+    # (bsz, max_context_len, 3); (bsz, max_context_len)
+    context_vads_batch, context_vad_batch = merge_vad(
+        item_info['vads'], item_info['vad'])
 
+    # assert input_batch.size(1) == context_vad_batch.size(1)
+    ## concepts, vads, vad
+    concept_inputs = merge_concept(item_info['concept'],
+                                   item_info['concept_ext'],
+                                   item_info["concept_vads"],
+                                   item_info["concept_vad"])  # (bsz, max_concept_len)
+    concept_batch, concept_ext_batch, concept_lengths, mask_concept, token_concept_lengths, concepts_vads_batch, concepts_vad_batch = concept_inputs
+    ## adja_mask (bsz, max_context_len, max_context_len+max_concept_len)
+    if concept_batch.size()[0] != 0:
+        adjacency_mask_batch = adj_mask(
+            input_batch, input_lengths, concept_batch, token_concept_lengths)
+    else:
+        adjacency_mask_batch = torch.Tensor([])
     # Target
     target_batch, target_lengths = merge(item_info["target"])
-
+    target_ext_batch, _ = merge(item_info['target_ext'])
     # input_batch = input_batch
     # mask_input = mask_input
     # target_batch = target_batch
@@ -783,8 +794,9 @@ def collate_fn(data):
     d["target_batch"] = target_batch
     d["target_lengths"] = torch.LongTensor(target_lengths)
     d["emotion_context_batch"] = emotion_batch
-
+    d["context_ext_batch"] = context_ext_batch  # (bsz, max_context_len)
     # program
+    d["emotion_widx"] = torch.LongTensor(item_info['emotion_widx'])
     d["target_program"] = item_info["emotion"]
     d["program_label"] = item_info["emotion_label"]
 
@@ -793,9 +805,21 @@ def collate_fn(data):
     d["target_txt"] = item_info["target_text"]
     d["program_txt"] = item_info["emotion_text"]
     d["situation_txt"] = item_info["situation_text"]
-
+    d["context_vads"] = context_vads_batch  # (bsz, max_context_len, 3)
+    d["context_vad"] = context_vad_batch  # (bsz, max_context_len)
     d["context_emotion_scores"] = item_info["context_emotion_scores"]
+    d["concept_txt"] = item_info['concept_text']
+    d["oovs"] = item_info["oovs"]
+    # concept
+    d["concept_batch"] = concept_batch  # (bsz, max_concept_len)
+    d["concept_ext_batch"] = concept_ext_batch  # (bsz, max_concept_len)
+    d["concept_lengths"] = torch.LongTensor(concept_lengths)  # (bsz)
+    d["mask_concept"] = mask_concept  # (bsz, max_concept_len)
+    d["concept_vads_batch"] = concepts_vads_batch  # (bsz, max_concept_len, 3)
+    d["concept_vad_batch"] = concepts_vad_batch   # (bsz, max_concept_len)
+    d["adjacency_mask_batch"] = adjacency_mask_batch.bool()
 
+    # assert d["emotion_widx"].size() == d["program_label"].size()
     relations = ["x_intent", "x_need", "x_want", "x_effect", "x_react"]
     for r in relations:
         pad_batch, _ = merge(item_info[r])
