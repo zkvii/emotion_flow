@@ -13,9 +13,9 @@
             "justMyCode": true,
             "args": [
                 "--model",
-                "mime",
+                "moel",
                 "--devices",
-                "0,1",
+                "4",
                 "--batch_size",
                 "32",
                 "--mode",

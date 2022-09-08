@@ -329,8 +329,8 @@ class MulDecoder(LightningModule):
         self.layer_norm = LayerNorm(hidden_size)
         self.input_dropout = nn.Dropout(input_dropout)
 
-    def forward(self, inputs, encoder_output, mask, attention_epxert):
-        attention_epxert.to(self.device)
+    def forward(self, inputs, encoder_output, mask, attention_expert):
+        attention_expert=attention_expert.to(self.device)
         # mask.to(self.device)
         mask_src, mask_trg = mask
         dec_mask = torch.gt(
@@ -350,13 +350,13 @@ class MulDecoder(LightningModule):
 
         # compute experts
         # TODO forward all experts in parrallel
-        if attention_epxert.shape[0] == 1 and config.topk > 0:
+        if attention_expert.shape[0] == 1 and config.topk > 0:
             for i, expert in enumerate(self.experts):
-                if attention_epxert[0, i] > 0.0001:  # speed up inference
+                if attention_expert[0, i] > 0.0001:  # speed up inference
                     expert_out, _, attn_dist, _ = expert(
                         (x, encoder_output, [], (mask_src, dec_mask))
                     )
-                    expert_outputs.append(attention_epxert[0, i] * expert_out)
+                    expert_outputs.append(attention_expert[0, i] * expert_out)
             x = torch.stack(expert_outputs, dim=1)
             x = x.sum(dim=1)
 
@@ -369,7 +369,7 @@ class MulDecoder(LightningModule):
             x = torch.stack(
                 expert_outputs, dim=1
             )  # (batch_size, expert_number, len, hidden_size)
-            x = attention_epxert * x
+            x = attention_expert * x
             x = x.sum(dim=1)  # (batch_size, len, hidden_size)
         if config.basic_learner:
             x += basic_out
