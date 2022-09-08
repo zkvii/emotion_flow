@@ -20,7 +20,7 @@ from util.constants import EMO_MAP_ORIGIN as emo_map_o
 from util.constants import EMO_MAP_RANDOM as emo_map_r
 from util.constants import DATA_FILES
 from util import config
-from util.common import save_config
+from util.common import get_wordnet_pos, save_config
 import os
 import numpy as np
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
@@ -49,29 +49,29 @@ class Lang:
             self.word2count[word] += 1
 
 
-def get_wordnet_pos(tag):
-    """replace word tag with word net mark
+# def get_wordnet_pos(tag):
+#     """replace word tag with word net mark
 
-    Parameters
-    ----------
-    tag : _type_
-        _description_
+#     Parameters
+#     ----------
+#     tag : _type_
+#         _description_
 
-    Returns
-    -------
-    _type_
-        _description_
-    """
-    if tag.startswith("J"):
-        return wordnet.ADJ
-    elif tag.startswith("V"):
-        return wordnet.VERB
-    elif tag.startswith("N"):
-        return wordnet.NOUN
-    elif tag.startswith("R"):
-        return wordnet.ADV
-    else:
-        return None
+#     Returns
+#     -------
+#     _type_
+#         _description_
+#     """
+#     if tag.startswith("J"):
+#         return wordnet.ADJ
+#     elif tag.startswith("V"):
+#         return wordnet.VERB
+#     elif tag.startswith("N"):
+#         return wordnet.NOUN
+#     elif tag.startswith("R"):
+#         return wordnet.ADV
+#     else:
+#         return None
 
 
 def process_sent(sentence):
@@ -149,7 +149,7 @@ def encode_ctx(vocab, items, data_dict, comet):
 
 
 def encode_context(vocab, items, data_dict, comet):
-    # items = items[:1024]
+    items = items[:1024]
     commonsense_item = []
     for ctx in tqdm(items):
         ctx_list = []
