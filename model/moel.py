@@ -518,19 +518,6 @@ class MOEL(LightningModule):
         self.log('valid_bce',bce)
         self.log('valid_acc',acc)
         return loss
-    # def save_model(self, running_avg_ppl, iter):
-    #     state = {
-    #         "iter": iter,
-    #         "optimizer": self.optimizer.state_dict(),
-    #         "current_loss": running_avg_ppl,
-    #         "model": self.state_dict(),
-    #     }
-    #     model_save_path = os.path.join(
-    #         self.model_dir,
-    #         "MoEL_{}_{:.4f}".format(iter, running_avg_ppl),
-    #     )
-    #     self.best_path = model_save_path
-    #     torch.save(state, model_save_path)
 
     def train_one_batch(self, batch, iter, train=True):
         (

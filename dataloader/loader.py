@@ -299,7 +299,7 @@ class Dataset(data.Dataset):
             item["emotion_context_mask"],
         ) = self.preprocess(item["emotion_context"])
 
-
+        # cem data
         item["cs_text"] = self.data["utt_cs"][index]
         item["x_intent_txt"] = item["cs_text"][0]
         item["x_need_txt"] = item["cs_text"][1]
@@ -313,6 +313,19 @@ class Dataset(data.Dataset):
         item["x_effect"] = self.preprocess(item["x_effect_txt"], cs=True)
         item["x_react"] = self.preprocess(item["x_react_txt"], cs="react")
 
+        ##kemp data
+        inputs = self.preprocess_kemp([self.data["context"][index],
+                                  self.data["vads"][index],
+                                  self.data["vad"][index],
+                                  self.data["concepts"][index]])
+        item["kemp_context"], item["context_ext"], item["context_mask"], item["vads"], item["vad"], \
+        item["concept_text"], item["concept"], item["concept_ext"], item["concept_vads"], item["concept_vad"], \
+        item["oovs"]= inputs
+        item["target_kemp"] = self.preprocess(item["target_text"], anw=True)
+        item["target_ext"] = self.target_oovs(item["target_text"], item["oovs"])
+        item["emotion"], item["emotion_label"] = self.preprocess_emo(item["emotion_text"],
+                                                                     self.emo_map)  # one-hot and scalor label
+        item["emotion_widx"] = self.word2index[item["emotion_text"]]
         return item
 
     def preprocess(self, arr, anw=False, cs=None, emo=False):
