@@ -10,8 +10,7 @@ SOS_idx = 3
 USR_idx = 4
 SYS_idx = 5
 CLS_idx = 6
-CLS_idx = 7
-SEP_idx = 8
+SEP_idx = 7
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")
@@ -79,6 +78,8 @@ parser.add_argument("--hop", type=int, default=1)
 parser.add_argument("--heads", type=int, default=2)
 parser.add_argument("--depth", type=int, default=40)
 parser.add_argument("--filter", type=int, default=50)
+parser.add_argument("--max_seq_length", type=int, default=1000)
+parser.add_argument("--dropout", type=float, default=0.2)
 parser.add_argument("--devices", type=str, default='0')
 
 # concept
@@ -127,6 +128,8 @@ cov_loss_wt = 1.0
 lr_coverage = 0.15
 eps = 1e-12
 max_epoch = args.max_epoch
+max_seq_length=args.max_seq_length
+dropout = args.dropout
 
 emb_file = args.emb_file or "vectors/glove.6B.{}d.txt".format(str(emb_dim))
 pretrain_emb = args.pretrain_emb

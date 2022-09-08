@@ -4,12 +4,9 @@ import nltk
 import json
 import torch
 import pickle
-import logging
-import numpy as np
 from tqdm.auto import tqdm
-from torch.utils.data import Dataset
 import torch.utils.data as data
-from nltk.corpus import wordnet, stopwords
+from nltk.corpus import stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from dataloader.concept_preprocess import aug_kemp
 from util.constants import WORD_PAIRS as word_pairs
@@ -22,6 +19,9 @@ from util import config
 from util.common import get_wordnet_pos
 import os
 import numpy as np
+import logging
+from nltk.corpus import wordnet
+
 relations = ["xIntent", "xNeed", "xWant", "xEffect", "xReact"]
 emotion_lexicon = json.load(open("data/NRCDict.json"))[0]
 stop_words = stopwords.words("english")
@@ -217,8 +217,8 @@ def encode(vocab, files):
     comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
-        # items = files[i][:320]
-        items = files[i]
+        items = files[i][:320]
+        # items = files[i]
         if k == "context":
             # encoding context
 
@@ -273,7 +273,7 @@ def read_files(vocab):
     # kemp augmentation
     # get_concept_dict(vocab)
     # rank_concept_dict()
-    aug_kemp(data_train,data_dev,data_test,vocab)
+    aug_kemp(data_train, data_dev, data_test, vocab)
     #
     return data_train, data_dev, data_test, vocab
 
@@ -304,13 +304,14 @@ def load_dataset():
         data_tra, data_val, data_tst, vocab = read_files(
             vocab=Lang(
                 {
-                    config.UNK_idx: "UNK",
-                    config.PAD_idx: "PAD",
-                    config.EOS_idx: "EOS",
-                    config.SOS_idx: "SOS",
-                    config.USR_idx: "USR",
-                    config.SYS_idx: "SYS",
-                    config.CLS_idx: "CLS",
+                    config.UNK_idx: "<UNK>",
+                    config.PAD_idx: "<PAD>",
+                    config.EOS_idx: "<EOS>",
+                    config.SOS_idx: "<SOS>",
+                    config.USR_idx: "<USR>",
+                    config.SYS_idx: "<SYS>",
+                    config.CLS_idx: "<CLS>",
+                    config.SEP_idx: "<SEP>",
                 }
             )
         )
@@ -360,7 +361,7 @@ class Dataset(data.Dataset):
         item["target_text"] = self.data["target"][index]
         item["emotion_text"] = self.data["emotion"][index]
         item["emotion_context"] = self.data["emotion_context"][index]
-        # context emo score
+        # context emo score for mime
         item["context_emotion_scores"] = self.analyzer.polarity_scores(
             " ".join(self.data["context"][index][0])
         )
@@ -406,6 +407,27 @@ class Dataset(data.Dataset):
                                                                      self.emo_map)  # one-hot and scalor label
         item["emotion_widx"] = self.vocab.word2index[item["emotion_text"]]
         return item
+
+    def process_oov(self, context, concept):  #
+        ids = []
+        oovs = []
+        for si, sentence in enumerate(context):
+            for w in sentence:
+                if w in self.vocab.word2index:
+                    i = self.vocab.word2index[w]
+                    ids.append(i)
+                else:
+                    if w not in oovs:
+                        oovs.append(w)
+                    oov_num = oovs.index(w)
+                    ids.append(len(self.vocab.word2index) + oov_num)
+
+        for sentence_concept in concept:
+            for token_concept in sentence_concept:
+                for c in token_concept:
+                    if c not in oovs and c not in self.vocab.word2index:
+                        oovs.append(c)
+        return ids, oovs
 
     def preprocess(self, arr, anw=False, cs=None, emo=False, kemp=False):
         """Converts words to ids."""
@@ -453,9 +475,9 @@ class Dataset(data.Dataset):
             concept_vads = [arr[3][l][1] for l in range(len(arr[3]))]
             concept_vad = [arr[3][l][2] for l in range(len(arr[3]))]
 
-            X_dial = [self.args.CLS_idx]
-            X_dial_ext = [self.args.CLS_idx]
-            X_mask = [self.args.CLS_idx]  # for dialogue state
+            X_dial = [config.CLS_idx]
+            X_dial_ext = [config.CLS_idx]
+            X_mask = [config.CLS_idx]  # for dialogue state
             X_vads = [[0.5, 0.0, 0.5]]
             X_vad = [0.0]
 
@@ -471,8 +493,8 @@ class Dataset(data.Dataset):
 
             for i, sentence in enumerate(context):
                 X_dial += [self.vocab.word2index[word]
-                           if word in self.vocab.word2index else self.args.UNK_idx for word in sentence]
-                spk = self.vocab.word2index["[USR]"] if i % 2 == 0 else self.vocab.word2index["[SYS]"]
+                           if word in self.vocab.word2index else config.UNK_idx for word in sentence]
+                spk = self.vocab.word2index["<USR>"] if i % 2 == 0 else self.vocab.word2index["[SYS]"]
                 X_mask += [spk for _ in range(len(sentence))]
                 X_vads += context_vads[i]
                 X_vad += context_vad[i]
@@ -485,12 +507,12 @@ class Dataset(data.Dataset):
                         X_concept_vad.append(0.0)
                     else:
                         X_concept_text[sentence[j]
-                                       ] += token_conlist[:self.args.concept_num]
+                                       ] += token_conlist[:config.concept_num]
                         X_concept.append(
-                            [self.vocab.word2index[con_word] if con_word in self.vocab.word2index else self.args.UNK_idx for con_word in token_conlist[:self.args.concept_num]])
+                            [self.vocab.word2index[con_word] if con_word in self.vocab.word2index else config.UNK_idx for con_word in token_conlist[:config.concept_num]])
 
                         con_ext = []
-                        for con_word in token_conlist[:self.args.concept_num]:
+                        for con_word in token_conlist[:config.concept_num]:
                             if con_word in self.vocab.word2index:
                                 con_ext.append(self.vocab.word2index[con_word])
                             else:
@@ -498,15 +520,15 @@ class Dataset(data.Dataset):
                                     con_ext.append(X_oovs.index(
                                         con_word) + len(self.vocab.word2index))
                                 else:
-                                    con_ext.append(self.args.UNK_idx)
+                                    con_ext.append(config.UNK_idx)
                         X_concept_ext.append(con_ext)
                         X_concept_vads.append(
-                            concept_vads[i][j][:self.args.concept_num])
+                            concept_vads[i][j][:config.concept_num])
                         X_concept_vad.append(
-                            concept_vad[i][j][:self.args.concept_num])
+                            concept_vad[i][j][:config.concept_num])
 
-                        assert len([self.vocab.word2index[con_word] if con_word in self.vocab.word2index else self.args.UNK_idx for con_word in token_conlist[:self.args.concept_num]]) == len(
-                            concept_vads[i][j][:self.args.concept_num]) == len(concept_vad[i][j][:self.args.concept_num])
+                        assert len([self.vocab.word2index[con_word] if con_word in self.vocab.word2index else config.UNK_idx for con_word in token_conlist[:config.concept_num]]) == len(
+                            concept_vads[i][j][:config.concept_num]) == len(concept_vad[i][j][:config.concept_num])
             assert len(X_dial) == len(X_mask) == len(
                 X_concept) == len(X_concept_vad) == len(X_concept_vads)
 
@@ -525,9 +547,9 @@ class Dataset(data.Dataset):
                     for word in sentence
                 ]
                 spk = (
-                    self.vocab.word2index["USR"]
+                    self.vocab.word2index["<USR>"]
                     if i % 2 == 0
-                    else self.vocab.word2index["SYS"]
+                    else self.vocab.word2index["<SYS>"]
                 )
                 x_mask += [spk for _ in range(len(sentence))]
             assert len(x_dial) == len(x_mask)

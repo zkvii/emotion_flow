@@ -330,14 +330,12 @@ class Transformer(LightningModule):
         self,
         vocab,
         decoder_number,
-        hp=config.args,
         is_multitask=False,
     ):
         super(Transformer, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
         self.multitask = is_multitask
-        self.save_hyperparameters(ignore=['vocab'])
 
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
         self.encoder = Encoder(

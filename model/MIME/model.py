@@ -522,6 +522,7 @@ class MIME(LightningModule):
         elif config.emo_combine == "gate":
             v = self.cdecoder(m_out, m_tilde_out)
         elif config.emo_combine == "vader":
+            context_emo_scores=batch['context_emotion_scores']
             m_weight = context_emo_scores.unsqueeze(-1).unsqueeze(-1)
             m_tilde_weight = 1 - m_weight
             v = m_weight * m_weight + m_tilde_weight * m_tilde_out
@@ -536,7 +537,8 @@ class MIME(LightningModule):
                     self.embedding_proj_in(encoder_outputs),
                     self.embedding_proj_in(v),
                     (mask_src, mask_trg),
-                    attention_parameters,
+                    # attention_parameters,
+                    config.depth
                 )
             else:
                 out, attn_dist = self.decoder(
@@ -658,6 +660,8 @@ class MIME(LightningModule):
         elif config.emo_combine == "gate":
             v = self.cdecoder(m_out, m_tilde_out)
         elif config.emo_combine == "vader":
+
+            context_emo_scores=batch['context_emotion_scores']
             m_weight = context_emo_scores.unsqueeze(-1).unsqueeze(-1)
             m_tilde_weight = 1 - m_weight
             v = m_weight * m_weight + m_tilde_weight * m_tilde_out
@@ -671,7 +675,8 @@ class MIME(LightningModule):
                     self.embedding_proj_in(self.embedding(ys)),
                     self.embedding_proj_in(encoder_outputs),
                     (mask_src, mask_trg),
-                    attention_parameters,
+                    # attention_parameters,
+                    config.depth
                 )
             else:
                 out, attn_dist = self.decoder(

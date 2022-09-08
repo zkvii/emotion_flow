@@ -5,6 +5,7 @@ from pytorch_lightning import Trainer
 from dataloader.loader import prepare_data_seq
 # from torch.utils.data import DataLoader
 from model.empdg import EMPDG
+from model.kemp import KEMP
 from model.moel import MOEL
 from model.trans import Transformer
 from model.MIME.model import MIME
@@ -86,7 +87,8 @@ def main():
             vocab,
             decoder_number=decoder_num,
         )
-
+    elif config.model == 'kemp':
+        model = KEMP(vocab=vocab,decoder_number=decoder_num)
     # Intialization
     for n, p in model.named_parameters():
         if p.dim() > 1 and (n != "embedding.lut.weight" and config.pretrain_emb):
@@ -146,5 +148,5 @@ def main():
 
 
 if __name__ == '__main__':
-    prepare_data_seq()
-    # main()
+    # prepare_data_seq()
+    main()
