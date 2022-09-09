@@ -13,10 +13,9 @@ from model.common import (
     LayerNorm,
     _gen_bias_mask,
     _gen_timing_signal,
+    _get_attn_subsequent_mask,
     share_embedding,
     LabelSmoothing,
-    NoamOpt,
-    _get_attn_subsequent_mask,
     get_input_from_batch,
     get_output_from_batch,
     top_k_top_p_filtering,
@@ -24,8 +23,7 @@ from model.common import (
 from sklearn.metrics import accuracy_score
 from util import config
 import random
-import os
-
+from model.translator.moel_translator import Translator
 
 class Encoder(LightningModule):
     """
@@ -503,6 +501,10 @@ class MOEL(LightningModule):
         #     os.makedirs(self.model_dir)
         # self.best_path = ""
 
+
+        self.res = {}
+        self.gdn = {}
+        
     def training_step(self,batch,batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch,batch_idx)
         self.log('train_ppl',ppl)
@@ -517,6 +519,36 @@ class MOEL(LightningModule):
         self.log('valid_loss',loss)
         self.log('valid_bce',bce)
         self.log('valid_acc',acc)
+        return loss
+
+    def test_step(self, batch, batch_idx):
+
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+
+        file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        outputs = open(file_path, 'a+', encoding='utf-8')
+        self.log('test_ppl', ppl)
+        self.log('test_loss', loss)
+        self.log('test_bce', bce)
+        self.log('test_acc', acc)
+        sent_g = self.decoder_greedy(batch)
+        t = Translator(self, self.vocab)
+        sent_b = t.beam_search(batch, max_dec_step=config.max_dec_step)
+        ref, hyp_g = [], []
+        for i, greedy_sent in enumerate(sent_g):
+            rf = " ".join(batch["target_txt"][i])
+            hyp_g.append(greedy_sent)
+            ref.append(rf)
+            self.res[batch_idx] = greedy_sent.split()
+            self.gdn[batch_idx] = batch["target_txt"][i]  # targets.split()
+            outputs.write("Emotion:{} \n".format(batch["program_txt"][i]))
+            outputs.write("Context:{} \n".format(
+                [" ".join(s) for s in batch['input_txt'][i]]))
+            # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
+            outputs.write("Pred:{} \n".format(greedy_sent))
+            outputs.write(f"Beam:{sent_b[i]} \n")
+            outputs.write("Ref:{} \n".format(rf))
+
         return loss
 
     def train_one_batch(self, batch, iter, train=True):
@@ -538,7 +570,7 @@ class MOEL(LightningModule):
         #     self.optimizer.zero_grad()
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
         ## Attention over decoder
         q_h = (
@@ -667,7 +699,7 @@ class MOEL(LightningModule):
             _,
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
         ## Attention over decoder
         q_h = (
@@ -682,7 +714,7 @@ class MOEL(LightningModule):
             k_max_value, k_max_index = torch.topk(logit_prob, config.topk)
             a = np.empty([logit_prob.shape[0], self.decoder_number])
             a.fill(float("-inf"))
-            mask = torch.Tensor(a)
+            mask = torch.Tensor(a).to(self.device)
             logit_prob = mask.scatter_(
                 1, k_max_index.long(), k_max_value
             )
@@ -697,7 +729,7 @@ class MOEL(LightningModule):
             -1
         )  # (batch_size, expert_num, 1, 1)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -732,7 +764,7 @@ class MOEL(LightningModule):
             )
             next_word = next_word.data[0]
             ys = torch.cat(
-                [ys, torch.ones(1, 1).long().fill_(next_word)],
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)],
                 dim=1,
             )
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
@@ -760,7 +792,7 @@ class MOEL(LightningModule):
             _,
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
         ## Attention over decoder

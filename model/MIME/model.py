@@ -272,7 +272,7 @@ class MIME(LightningModule):
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
         q_h = (
@@ -460,7 +460,7 @@ class MIME(LightningModule):
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
         q_h = (
@@ -599,7 +599,7 @@ class MIME(LightningModule):
         ## Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(self.embedding(enc_batch) + emb_mask, mask_src)
 
         q_h = (

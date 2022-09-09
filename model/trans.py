@@ -1,6 +1,4 @@
 # TAKEN FROM https://github.com/kolloldas/torchnlp
-
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,11 +11,10 @@ from model.common import (
     LayerNorm,
     _gen_bias_mask,
     _gen_timing_signal,
+    get_input_from_batch,
     share_embedding,
     LabelSmoothing,
-    NoamOpt,
     _get_attn_subsequent_mask,
-    get_input_from_batch,
     get_output_from_batch,
     top_k_top_p_filtering,
 )
@@ -444,7 +441,7 @@ class Transformer(LightningModule):
         # Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
         # Decode
@@ -538,7 +535,7 @@ class Transformer(LightningModule):
             _,
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
 
@@ -604,7 +601,7 @@ class Transformer(LightningModule):
             _,
         ) = get_input_from_batch(batch)
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["mask_input"])
+        emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
 

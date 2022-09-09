@@ -205,7 +205,7 @@ class Translator(object):
 
             mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-            emb_mask = self.model.embedding(src_seq["mask_input"])
+            emb_mask = self.model.embedding(src_seq["input_mask"])
             src_emb = self.model.embedding(enc_batch) + emb_mask
             src_enc = self.model.encoder(src_emb, mask_src)
 

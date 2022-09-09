@@ -267,7 +267,7 @@ class Translator(object):
             ## Encode
             mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-            emb_mask = self.model.embedding(batch["mask_input"])
+            emb_mask = self.model.embedding(batch["input_mask"])
             encoder_outputs = self.model.encoder(
                 self.model.embedding(enc_batch) + emb_mask, mask_src
             )

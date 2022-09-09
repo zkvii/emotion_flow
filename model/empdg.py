@@ -570,7 +570,7 @@ class EMPDG(LightningModule):
         return loss
     
     def train_one_batch(self, batch, iter, train=True, loss_from_d=0.0):
-        enc_emo_batch = batch["emotion_context_batch"]
+        enc_emo_batch = batch["program_context_batch"]
 
         (
             enc_batch,
@@ -587,7 +587,7 @@ class EMPDG(LightningModule):
         mask_semantic = enc_batch.data.eq(config.PAD_idx).unsqueeze(
             1
         )  # (bsz, src_len)->(bsz, 1, src_len)
-        sem_emb_mask = self.embedding(batch["mask_input"])  # dialogue state  E_d
+        sem_emb_mask = self.embedding(batch["input_mask"])  # dialogue state  E_d
         sem_emb = self.embedding(enc_batch) + sem_emb_mask  # E_w+E_d
         sem_encoder_outputs = self.semantic_und(
             sem_emb, mask_semantic
@@ -676,7 +676,7 @@ class EMPDG(LightningModule):
             _,
             _,
         ) = get_input_from_batch(batch)
-        enc_emo_batch = batch["emotion_context_batch"]
+        enc_emo_batch = batch["program_context_batch"]
 
         # if config.noam:
         #     self.optimizer.optimizer.zero_grad()
@@ -687,7 +687,7 @@ class EMPDG(LightningModule):
         mask_semantic = enc_batch.data.eq(config.PAD_idx).unsqueeze(
             1
         )  # (bsz, src_len)->(bsz, 1, src_len)
-        sem_emb_mask = self.embedding(batch["mask_input"])  # dialogue state  E_d
+        sem_emb_mask = self.embedding(batch["input_mask"])  # dialogue state  E_d
         sem_emb = self.embedding(enc_batch) + sem_emb_mask  # E_w+E_d
         sem_encoder_outputs = self.semantic_und(
             sem_emb, mask_semantic

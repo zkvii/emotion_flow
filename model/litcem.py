@@ -448,7 +448,7 @@ class CEM(LightningModule):
         ## Encode the context (Semantic Knowledge)
         enc_batch = batch["input_batch"]
         src_mask = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        mask_emb = self.embedding(batch["mask_input"])
+        mask_emb = self.embedding(batch["input_mask"])
         src_emb = self.embedding(enc_batch) + mask_emb
         enc_outputs = self.encoder(src_emb, src_mask)  # batch_size * seq_len * 300
 

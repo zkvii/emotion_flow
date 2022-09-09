@@ -12,7 +12,7 @@ from util import config
 from model.translator.kemp_translator import Translator
 
 
-class Encoder():
+class Encoder(LightningModule):
     """
     A Transformer Encoder module. 
     Inputs should be in the shape [batch_size, length, hidden_size]
@@ -175,6 +175,7 @@ class Decoder(LightningModule):
         context_vad: (bsz, src_len) emotion intensity values
         '''
         mask_src, mask_trg = mask
+        self.mask = self.mask.to(self.device)
         dec_mask = torch.gt(
             mask_trg.bool() + self.mask[:, :mask_trg.size(-1), :mask_trg.size(-1)].bool(), 0)
         # Add input dropout
@@ -370,9 +371,9 @@ class KEMP(LightningModule):
         return new_context
 
     def train_one_batch(self, batch,batch_idx):
-        enc_batch = batch["context_batch"]
-        enc_batch_extend_vocab = batch["context_ext_batch"]
-        enc_vad_batch = batch['context_vad']
+        enc_batch = batch["input_batch"]
+        enc_batch_extend_vocab = batch["input_ext_batch"]
+        enc_vad_batch = batch['input_vad']
         concept_input = batch["concept_batch"]  # (bsz, max_concept_len)
         concept_ext_input = batch["concept_ext_batch"]
         concept_vad_batch = batch['concept_vad_batch']
@@ -381,7 +382,7 @@ class KEMP(LightningModule):
         max_oov_length = len(
             sorted(oovs, key=lambda i: len(i), reverse=True)[0])
         extra_zeros = Variable(torch.zeros(
-            (enc_batch.size(0), max_oov_length))).to(config.device)
+            (enc_batch.size(0), max_oov_length))).to(self.device)
 
         dec_batch = batch["target_batch"]
         dec_ext_batch = batch["target_ext_batch"]
@@ -390,7 +391,7 @@ class KEMP(LightningModule):
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(
             1)  # (bsz, src_len)->(bsz, 1, src_len)
         # dialogue state embedding
-        emb_mask = self.embedding(batch["mask_context"])
+        emb_mask = self.embedding(batch["input_mask"])
         src_emb = self.embedding(enc_batch)+emb_mask
         src_vad = enc_vad_batch  # (bsz, len, 1)  emotion intensity values
 
@@ -399,7 +400,7 @@ class KEMP(LightningModule):
                 mask_con = concept_input.data.eq(
                     config.PAD_idx).unsqueeze(1)  # real mask
                 con_mask = self.embedding(
-                    batch["mask_concept"])  # kg embedding
+                    batch["concept_mask"])  # kg embedding
                 con_emb = self.embedding(concept_input)+con_mask
 
                 # Knowledge Update
@@ -412,8 +413,7 @@ class KEMP(LightningModule):
                     (enc_vad_batch, concept_vad_batch), dim=1)  # (bsz, len)
 
         ## Encode - context & concept
-        encoder_outputs = self.encoder(
-            src_emb, mask_src)  # (bsz, src_len, emb_dim)
+        encoder_outputs = self.encoder(src_emb, mask_src)  # (bsz, src_len, emb_dim)
 
         # emotional signal distilling
         src_vad = torch.softmax(src_vad, dim=-1)
@@ -426,12 +426,13 @@ class KEMP(LightningModule):
 
         emotion_logit = self.identify(
             emotion_context)  # e_p (bsz, emotion_num)
+        program_label = torch.LongTensor(batch['program_label']).to(self.device)
         loss_emotion = nn.CrossEntropyLoss(reduction='sum')(
-            emotion_logit, batch['emotion_label'])
+            emotion_logit, program_label)
 
         pred_emotion = np.argmax(emotion_logit.detach().cpu().numpy(), axis=1)
         emotion_acc = accuracy_score(
-            batch["emotion_label"].cpu().numpy(), pred_emotion)
+            program_label.cpu().numpy(), pred_emotion)
 
         # Decode
         sos_emb = self.emotion_embedding(
@@ -473,7 +474,7 @@ class KEMP(LightningModule):
         loss_ppl = 0.0
         if config.label_smoothing:
             loss_ppl = self.criterion_ppl(logit.contiguous().view(-1, logit.size(-1)),
-                                          dec_batch.contiguous().view(-1) if config.pointer_gen else dec_ext_batch.contiguous().view(-1)).item()
+                                          dec_batch.contiguous().view(-1) if config.pointer_gen else dec_ext_batch.contiguous().view(-1))
 
         if torch.sum(torch.isnan(loss)) != 0:
             print('loss is NAN :(')
@@ -481,7 +482,7 @@ class KEMP(LightningModule):
         if config.label_smoothing:
             return loss_ppl, math.exp(min(loss_ppl, 100)), loss_emotion.item(), emotion_acc
         else:
-            return loss.item(), math.exp(min(loss.item(), 100)), 0, 0
+            return loss, math.exp(min(loss.item(), 100)), 0, 0
 
     def compute_act_loss(self, module):
         R_t = module.remainders
@@ -493,9 +494,9 @@ class KEMP(LightningModule):
 
     def decoder_greedy(self, batch, max_dec_step=30):
         enc_batch_extend_vocab, extra_zeros = None, None
-        enc_batch = batch["context_batch"]
-        enc_vad_batch = batch['context_vad']
-        enc_batch_extend_vocab = batch["context_ext_batch"]
+        enc_batch = batch["input_batch"]
+        enc_vad_batch = batch['input_vad']
+        enc_batch_extend_vocab = batch["input_ext_batch"]
 
         concept_input = batch["concept_batch"]  # (bsz, max_concept_len)
         concept_ext_input = batch["concept_ext_batch"]
@@ -504,12 +505,12 @@ class KEMP(LightningModule):
         max_oov_length = len(
             sorted(oovs, key=lambda i: len(i), reverse=True)[0])
         extra_zeros = Variable(torch.zeros(
-            (enc_batch.size(0), max_oov_length))).to(config.device)
+            (enc_batch.size(0), max_oov_length))).to(self.device)
 
         ## Encode - context
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(
             1)  # (bsz, src_len)->(bsz, 1, src_len)
-        emb_mask = self.embedding(batch["mask_context"])
+        emb_mask = self.embedding(batch["input_mask"])
         src_emb = self.embedding(enc_batch) + emb_mask
         src_vad = enc_vad_batch  # (bsz, len, 1)
 
@@ -518,7 +519,7 @@ class KEMP(LightningModule):
                 mask_con = concept_input.data.eq(
                     config.PAD_idx).unsqueeze(1)  # real mask
                 con_mask = self.embedding(
-                    batch["mask_concept"])  # dialogue state
+                    batch["concept_mask"])  # dialogue state
                 con_emb = self.embedding(concept_input) + con_mask
 
                 # Knowledge Update
@@ -549,12 +550,12 @@ class KEMP(LightningModule):
         else:
             enc_ext_batch = enc_batch_extend_vocab
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long()
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
         ys_emb = self.emotion_embedding(
             emotion_logit).unsqueeze(1)  # (bsz, 1, emb_dim)
         sos_emb = ys_emb
-        if config.USE_CUDA:
-            ys = ys.cuda()
+        # if config.USE_CUDA:
+            # ys = ys.cuda()
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step+1):
@@ -572,19 +573,20 @@ class KEMP(LightningModule):
             prob = self.generator(
                 out, None, None, attn_dist, enc_ext_batch if config.pointer_gen else None, extra_zeros)
             _, next_word = torch.max(prob[:, -1], dim=1)
+
             decoded_words.append(['<EOS>' if ni.item() == config.EOS_idx else self.index2word[str(
                 ni.item())] for ni in next_word.view(-1)])
             next_word = next_word.data[0]
 
             if config.use_cuda:
                 ys = torch.cat(
-                    [ys, torch.ones(1, 1).long().fill_(next_word).cuda()], dim=1)
+                    [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
                 ys = ys.cuda()
                 ys_emb = torch.cat((ys_emb, self.embedding(
-                    torch.ones(1, 1).long().fill_(next_word).cuda())), dim=1)
+                    torch.ones(1, 1).long().fill_(next_word).to(self.device))), dim=1)
             else:
                 ys = torch.cat(
-                    [ys, torch.ones(1, 1).long().fill_(next_word)], dim=1)
+                    [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
                 ys_emb = torch.cat((ys_emb, self.embedding(
                     torch.ones(1, 1).long().fill_(next_word))), dim=1)
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
@@ -601,9 +603,9 @@ class KEMP(LightningModule):
         return sent
 
     def training_step(self, batch, batch_idx):
-        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
-        self.log('train_ppl', ppl)
+        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)      
         self.log('train_loss', loss)
+        self.log('train_ppl', ppl)
         self.log('train_bce', bce)
         self.log('train_acc', acc)
         return loss

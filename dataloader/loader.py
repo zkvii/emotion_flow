@@ -788,25 +788,28 @@ def collate_fn(data):
     # target_batch = target_batch
 
     d = {}
+    #input represent as context
+    #program represent as emotion
+    #target as utterance
     d["input_batch"] = input_batch
     d["input_lengths"] = torch.LongTensor(input_lengths)
-    d["mask_input"] = mask_input
+    d["input_mask"] = mask_input
     d["target_batch"] = target_batch
+    d["target_ext_batch"] = target_ext_batch
     d["target_lengths"] = torch.LongTensor(target_lengths)
-    d["emotion_context_batch"] = emotion_batch
-    d["context_ext_batch"] = context_ext_batch  # (bsz, max_context_len)
+    d["program_context_batch"] = emotion_batch
+    d["input_ext_batch"] = context_ext_batch  # (bsz, max_context_len)
+    d["input_vads"] = context_vads_batch  # (bsz, max_context_len, 3)
+    d["input_vad"] = context_vad_batch  # (bsz, max_context_len)
     # program
-    d["emotion_widx"] = torch.LongTensor(item_info['emotion_widx'])
+    d["program_widx"] = torch.LongTensor(item_info['emotion_widx'])
     d["target_program"] = item_info["emotion"]
     d["program_label"] = item_info["emotion_label"]
-
     # text
     d["input_txt"] = item_info["context_text"]
     d["target_txt"] = item_info["target_text"]
     d["program_txt"] = item_info["emotion_text"]
     d["situation_txt"] = item_info["situation_text"]
-    d["context_vads"] = context_vads_batch  # (bsz, max_context_len, 3)
-    d["context_vad"] = context_vad_batch  # (bsz, max_context_len)
     d["context_emotion_scores"] = item_info["context_emotion_scores"]
     d["concept_txt"] = item_info['concept_text']
     d["oovs"] = item_info["oovs"]
@@ -814,7 +817,7 @@ def collate_fn(data):
     d["concept_batch"] = concept_batch  # (bsz, max_concept_len)
     d["concept_ext_batch"] = concept_ext_batch  # (bsz, max_concept_len)
     d["concept_lengths"] = torch.LongTensor(concept_lengths)  # (bsz)
-    d["mask_concept"] = mask_concept  # (bsz, max_concept_len)
+    d["concept_mask"] = mask_concept  # (bsz, max_concept_len)
     d["concept_vads_batch"] = concepts_vads_batch  # (bsz, max_concept_len, 3)
     d["concept_vad_batch"] = concepts_vad_batch   # (bsz, max_concept_len)
     d["adjacency_mask_batch"] = adjacency_mask_batch.bool()

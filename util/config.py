@@ -73,7 +73,7 @@ parser.add_argument("--emb_file", type=str)
 # parser.add_argument("--ds_name", type=str,default='ds_pre')
 parser.add_argument("--emotion_emb_type", type=str, default='origin',
                     help='condidates:order|origin|tolerance|random')
-
+parser.add_argument("--attn_loss",action="store_true",help="emotion loss")
 # transformer
 parser.add_argument("--hop", type=int, default=1)
 parser.add_argument("--heads", type=int, default=2)
@@ -141,6 +141,7 @@ save_path_dataset = args.save_path_dataset
 
 test = args.test
 mode = args.mode
+attn_loss = args.attn_loss
 # transformer
 hop = args.hop
 heads = args.heads

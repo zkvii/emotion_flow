@@ -8,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from util import config
-from tqdm import tqdm
 
 # if config.model == "trs" or config.model == "multi-trs":
 #     from src.utils.decode.transformer import Translator
@@ -173,8 +172,11 @@ class DecoderLayer(nn.Module):
         """
         NOTE: Inputs is a tuple consisting of decoder inputs and encoder output
         """
-
-        x, encoder_outputs, attention_weight, mask = inputs
+        if config.model not in ["kemp", "wo_ECE", "wo_EDD"]:
+            x, encoder_outputs, attention_weight, mask,  = inputs
+            pred_emotion, emotion_contexts = None, None
+        else:
+            x, encoder_outputs, pred_emotion, emotion_contexts, attention_weight, mask, = inputs
         mask_src, dec_mask = mask
 
         # Layer Normalization before decoder self attention
@@ -207,6 +209,8 @@ class DecoderLayer(nn.Module):
         y = self.dropout(x + y)
 
         # Return encoder outputs as well to work with nn.Sequential
+        if config.model in ["kemp", "wo_ECE", "wo_EDD"]:
+            return y, encoder_outputs, pred_emotion, emotion_contexts, attention_weight, mask
         return y, encoder_outputs, attention_weight, mask
 
 
