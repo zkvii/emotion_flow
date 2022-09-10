@@ -1,4 +1,5 @@
 import collections
+from email import header
 import math
 import ast
 from operator import index
@@ -6,6 +7,7 @@ import pdb
 import os
 import re
 import pandas as pd
+from tabulate import tabulate
 
 def _get_ngrams(segment, max_order):
     """Extracts all n-grams upto a given maximum order from an input segment.
@@ -122,32 +124,38 @@ def cal_one_model(file, opt=''):
     else:
         opt_f = open(file.rstrip('.txt')+'_metric.txt', 'w')
 
-    print(file)
-    opt_f.write(file +'\n')
+    # print(file)
+    # opt_f.write(file +'\n')
     result={'experiment':file.rstrip('.txt')}
+    # result={}
     with open(file, 'r') as f:
         target = []
         pred = []
         beam_preds=[]
 
         res = {}
+        beam_res={}
         itr = 0
+        beam_iter=0
         for line in f.readlines():
             if line.startswith('Pred:'):
                 p = line.strip('Pred:').strip()
+                pls = p.split()
+                pred.append(pls)
+                res[itr] = pls
+                itr += 1
                 # p = re.sub(r'([a-zA-Z])([,;?.!:\'/])', r"\1 \2", p)
             if line.startswith('Ref:'):
                 t = line.strip('Ref:').strip()
                 tls = t.split()
                 target.append([tls])
-                pls = p.split()
-                pred.append(pls)
-                res[itr] = pls
-                itr += 1
             if line.startswith('Beam:'):
                 b = line.strip('Beam:').strip()
                 bls = b.split()
                 beam_preds.append(bls)
+                beam_res[beam_iter]=bls
+                beam_iter+=1
+
         bleu1 = _compute_bleu(target, pred, max_order=1)
         bleu2 = _compute_bleu(target, pred, max_order=2)
         bleu4 = _compute_bleu(target, pred, max_order=4)
@@ -165,19 +173,25 @@ def cal_one_model(file, opt=''):
         })
 
     ma_dist1, ma_dist2, mi_dist1, mi_dist2, avg_len = get_dist(res)
-    print("Dist-1\tDist-2")
-    print(
-        "{:.2f}\t{:.2f}".format(mi_dist1 * 100, mi_dist2 * 100))
-    print(result)
-    print('\n\n')
+    
+    beam_ma_dist1, beam_ma_dist2, beam_mi_dist1, beam_mi_dist2, beam_avg_len = get_dist(beam_res)
+    result.update({
+        "ma_dist1":ma_dist1,
+        "ma_dist2":ma_dist2,
+        "mi_dist1":mi_dist1,
+        "mi_dist2":mi_dist2,
+        "avg_len":avg_len,
+        "beam_ma_dist1":beam_ma_dist1,
+        "beam_ma_dist2":beam_ma_dist2,
+        "beam_mi_dist1":beam_mi_dist1,
+        "beam_mi_dist2":beam_mi_dist2,
+        "beam_avg_len":beam_avg_len,
+    })
+    result_list=[(k,result[k]) for k in result]
+    format_metric=tabulate(result_list,headers=["metric","value"],tablefmt='fancy_grid')
+    print(format_metric)
+    opt_f.write(format_metric)
 
-    opt_f.write("Dist-1\tDist-2" +'\n')
-    opt_f.write(f"{(mi_dist1 * 100):.2f}\t{(mi_dist2 * 100):.2f}\n")
-    opt_f.write('Bleu1\tBleu2\tBleu4\n')
-    opt_f.write(f"{result['bleu1']:.2f}\t{result['bleu2']:.2f}\t{result['bleu4']}\n")
-
-    opt_f.write('Beam-Blue1\tBeam-Blue2\tBeam-Blue4\n')
-    opt_f.write(f"{result['bbleu1']:.2f}\t{result['bbleu2']:.2f}\t{result['bbleu4']}\n")
     df=pd.DataFrame(result,index=[0])
     df['Dist-1']=mi_dist1*100
     df['Dist-2']=mi_dist2*100

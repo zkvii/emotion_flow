@@ -1,7 +1,6 @@
 import torch
 import logging
 import argparse
-from util.common import print_opts
 
 UNK_idx = 0
 PAD_idx = 1
@@ -15,8 +14,9 @@ SEP_idx = 8
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")
-parser.add_argument("--code_check", action="store_true")
-parser.add_argument("--preprocess", action="store_true")
+parser.add_argument("--code_check", action="store_true",default=False)
+parser.add_argument("--preprocess", action="store_true",default=False)
+parser.add_argument("--machine_metrics", action="store_true",default=True)
 parser.add_argument("--emo_input", type=str,
                     default="self_att")  # cross_att; self_att
 parser.add_argument("--emo_combine", type=str, default="gate")  # att; gate
@@ -97,6 +97,7 @@ model = args.model
 data_dir = args.data_dir
 preprocess = args.preprocess
 code_check = args.code_check
+machine_metrics = args.machine_metrics
 
 large_decoder = args.large_decoder
 topk = args.topk

@@ -1,6 +1,8 @@
 # from turtle import forward
+from util.common import cal_metric
 import torch
 from pytorch_lightning import Trainer
+from util.eval import cal_one_model
 # from tqdm import tqdm
 from dataloader.loader import prepare_data_seq
 # from torch.utils.data import DataLoader
@@ -21,6 +23,7 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 from util.common import load_best_path, save_best_hparams,save_best_path
@@ -126,28 +129,38 @@ def main():
         trainer.fit(model=model, train_dataloaders=train_loader,
                     val_dataloaders=dev_loader)
         print('--------------------start test---------------------')
+        #save and load
         checkpoint_path=checkpoint_callback.best_model_path
         save_best_path(checkpoint_path)
         save_best_hparams(model)
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["state_dict"])
+        #clear old predicts
+        file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        if os.path.exists(file_path):
+            os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
+
     else:
         print('--------------------start test---------------------')
+        #load best model
         checkpoint_path=load_best_path()
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["state_dict"])
-        # print(model)
-        # model.load_from_checkpoint(checkpoint_path)
         # clear old predicts if need overwrite use date
         file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
         if os.path.exists(file_path):
             os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
 
+    if config.machine_metrics and config.mode != 'only_train':
+        cal_one_model(file_path)
+
 
 if __name__ == '__main__':
-    if config.preprocess:
-        prepare_data_seq()
-    else:
-        main()
+    # if config.preprocess:
+    #     prepare_data_seq()
+    # else:
+    #     main()
+
+    cal_metric('./predicts/cem-origin-results.txt')
