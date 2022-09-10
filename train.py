@@ -147,5 +147,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # prepare_data_seq()
-    main()
+    if config.preprocess:
+        prepare_data_seq()
+    else:
+        main()
