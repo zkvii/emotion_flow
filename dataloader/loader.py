@@ -192,7 +192,10 @@ def encode(vocab, files):
     comet = Comet("./data/ED/comet")
 
     for i, k in enumerate(data_dict.keys()):
-        items = files[i][:100]
+
+        items = files[i]
+        if config.code_check:
+            items = items[:32]
         # items = files[i]
         if k == "context":
             # encoding context
@@ -609,7 +612,7 @@ def collate_fn(data):
                 vad += samples_vad[i][c]
 
             if length > config.total_concept_num:
-                value, rank = torch.topk(torch.LongTensor(
+                value, rank = torch.topk(torch.Tensor(
                     vad), k=config.total_concept_num)
 
                 new_length = 1
@@ -880,3 +883,4 @@ if __name__ == '__main__':
         16)
     sample_batch = next(iter(train_loader))
     print('hello')
+

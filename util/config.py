@@ -15,6 +15,7 @@ SEP_idx = 8
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")
+parser.add_argument("--code_check", action="store_true")
 parser.add_argument("--emo_input", type=str,
                     default="self_att")  # cross_att; self_att
 parser.add_argument("--emo_combine", type=str, default="gate")  # att; gate
@@ -93,6 +94,9 @@ args = parser.parse_args()
 # print_opts(args)
 model = args.model
 data_dir = args.data_dir
+
+code_check = args.code_check
+
 large_decoder = args.large_decoder
 topk = args.topk
 l1 = args.l1

@@ -120,21 +120,31 @@ class Translator(object):
                 ## masking
                 mask_trg = dec_seq.data.eq(config.PAD_idx).unsqueeze(1)
                 mask_src = torch.cat([mask_src[0].unsqueeze(0)] * mask_trg.size(0), 0)
-                dec_output, attn_dist = self.model.decoder(
+                dec_output, attn_dist,_ = self.model.decoder(
                     self.model.embedding(dec_seq), enc_output, (mask_src, mask_trg)
                 )
 
+                concept_input = src_batch["concept_batch"]  # (bsz, max_concept_len)
+                concept_ext_input = src_batch["concept_ext_batch"]
+                enc_batch_extend_vocab = src_batch["input_ext_batch"]
+                if concept_input.size()[0] != 0 and config.model != 'wo_ECE':
+                    enc_ext_batch = torch.cat(
+                    (enc_batch_extend_vocab, concept_ext_input), dim=1)
+                else:
+                    enc_ext_batch = enc_batch_extend_vocab
                 db_dist = None
 
-                prob = self.model.generator(
-                    dec_output,
-                    attn_dist,
-                    enc_batch_extend_vocab,
-                    extra_zeros,
-                    1,
-                    True,
-                    attn_dist_db=db_dist,
-                )
+                # prob = self.model.generator(
+                #     dec_output,
+                #     attn_dist,
+                #     enc_batch_extend_vocab,
+                #     extra_zeros,
+                #     1,
+                #     True,
+                #     attn_dist_db=db_dist,
+                # )
+
+                prob = self.model.generator(dec_output, None, None, attn_dist, enc_ext_batch if config.pointer_gen else None, extra_zeros)
                 # prob = F.log_softmax(prob,dim=-1) #fix the name later
                 word_prob = prob[:, -1]
                 word_prob = word_prob.view(n_active_inst, n_bm, -1)
@@ -218,6 +228,7 @@ class Translator(object):
             # -- Repeat data for beam search
             n_bm = self.beam_size
             n_inst, len_s, d_h = src_enc.size()
+            src_batch=src_seq
             src_seq = enc_batch.repeat(1, n_bm).view(n_inst * n_bm, len_s)
             src_enc = src_enc.repeat(1, n_bm, 1).view(n_inst * n_bm, len_s, d_h)
 

@@ -574,21 +574,19 @@ class KEMP(LightningModule):
                 out, None, None, attn_dist, enc_ext_batch if config.pointer_gen else None, extra_zeros)
             _, next_word = torch.max(prob[:, -1], dim=1)
 
-            decoded_words.append(['<EOS>' if ni.item() == config.EOS_idx else self.index2word[str(
-                ni.item())] for ni in next_word.view(-1)])
+            decoded_words.append(['<EOS>' if ni.item() == config.EOS_idx else self.index2word[ni.item()] for ni in next_word.view(-1)])
             next_word = next_word.data[0]
 
-            if config.use_cuda:
-                ys = torch.cat(
-                    [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
-                ys = ys.cuda()
-                ys_emb = torch.cat((ys_emb, self.embedding(
-                    torch.ones(1, 1).long().fill_(next_word).to(self.device))), dim=1)
-            else:
-                ys = torch.cat(
-                    [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
-                ys_emb = torch.cat((ys_emb, self.embedding(
-                    torch.ones(1, 1).long().fill_(next_word))), dim=1)
+            # if config.use_cuda:
+            ys = torch.cat(
+                [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
+            ys_emb = torch.cat((ys_emb, self.embedding(
+                torch.ones(1, 1).long().fill_(next_word).to(self.device))), dim=1)
+            # else:
+            #     ys = torch.cat(
+            #         [ys, torch.ones(1, 1).long().fill_(next_word).to(self.device)], dim=1)
+            #     ys_emb = torch.cat((ys_emb, self.embedding(
+            #         torch.ones(1, 1).long().fill_(next_word))), dim=1)
             mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
 
         sent = []
