@@ -12,8 +12,8 @@
 ---
 result: 
 
-<img src='./cache_files/comet_dir.png' width=50/>
-<img src='./cache_files/vectors.png' width=50/>
+<img src='./cache_files/comet_dir.png' width=100/>
+<img src='./cache_files/vectors.png' width=100/>
 
 ---
 
