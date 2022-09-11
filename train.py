@@ -162,5 +162,3 @@ if __name__ == '__main__':
         prepare_data_seq()
     else:
         main()
-
-    # cal_metric('./predicts/cem-origin-results.txt')

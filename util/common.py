@@ -6,6 +6,9 @@ import numpy as np
 from util import config
 import yaml
 from torchmetrics.text.bert import BERTScore
+from torchmetrics.functional import bleu_score
+from torchmetrics.functional import rouge_score
+from nltk.translate.meteor_score import meteor_score
 from torchmetrics import BLEUScore, CharErrorRate, CHRFScore, ExtendedEditDistance, MatchErrorRate
 from torchmetrics.text.rouge import ROUGEScore
 from nltk.corpus import wordnet
@@ -127,7 +130,7 @@ def save_best_hparams(model):
 
 
 def cal_metric(file):
-    context=[]
+    contexts=[]
     emotions = []
     predicts=[]
     beam_predicts=[]
@@ -142,7 +145,9 @@ def cal_metric(file):
                 emotions.append(line.strip('Emotion:').strip())
             elif line.startswith('Beam:'):
                 beam_predicts.append(line.strip('Beam:').strip())
-    print(len(emotions),len(predicts),len(beam_predicts))
+            elif line.startswith('Context'):
+                contexts.append(line.strip('Context:').strip())
+    # print(len(emotions),len(predicts),len(beam_predicts))
     assert len(emotions) == len(predicts) == len(beam_predicts) == len(refs)
     result={
         'bleu1':0,
@@ -152,6 +157,7 @@ def cal_metric(file):
         'beam-bleu2':0,
         'beam-bleu4':0,
         'bertscore':0,
+        'meteor':0,
         'rouge1':0,
         'rouge2':0,
         'rougeL':0,
@@ -161,13 +167,19 @@ def cal_metric(file):
         'beam-rougeL':0,
         'beam-rougeLsum':0,
         'beam-bertscore':0,
+        'beam-meteor':0
     }
     ##init metric fun
     bertscore = BERTScore(device='cuda')
-
     for i in tqdm(range(0,len(predicts),32)):
-        emotion_batch = emotion_batch[i:i+32]
         beam_batch = beam_predicts[i:i+32]
+        predict_batch = predicts[i:i+32]
+        ref_batch = refs[i:i+32]
         
-        # bert_score = bertscore(predict,ref)
+        # cur_bert_score = bertscore(predict_batch,ref_batch)['f1']
+        result['bertscore'] += sum(bertscore(predict_batch,ref_batch)['f1'])
+        result['beam-bertscore'] += sum(bertscore(beam_batch,ref_batch)['f1'])
+
+    for (context,emotion,ref,pred,beam_pred) in zip(contexts,emotions,refs,predicts,beam_predicts):
+        meteor_score_tk = meteor_score([ref],pred)
     print(result['bertscore'])
