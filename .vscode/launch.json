@@ -13,7 +13,7 @@
             "justMyCode": true,
             "args": [
                 "--model",
-                "kemp",
+                "trans",
                 "--devices",
                 "0",
                 "--batch_size",

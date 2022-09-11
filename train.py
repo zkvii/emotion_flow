@@ -153,14 +153,14 @@ def main():
             os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
 
-    if config.machine_metrics and config.mode != 'only_train':
-        cal_one_model(file_path)
+    # if config.machine_metrics and config.mode != 'only_train':
+    #     cal_one_model(file_path)
 
 
 if __name__ == '__main__':
-    # if config.preprocess:
-    #     prepare_data_seq()
-    # else:
-    #     main()
+    if config.preprocess:
+        prepare_data_seq()
+    else:
+        main()
 
-    cal_metric('./predicts/cem-origin-results.txt')
+    # cal_metric('./predicts/cem-origin-results.txt')
