@@ -266,7 +266,7 @@ def load_dataset():
     # cache_file = f"{data_dir}/dataset_preproc.p"
     cache_file = f"{data_dir}/ds_{config.emotion_emb_type}.p"
 
-    if os.path.exists(cache_file) and not config.code_check:
+    if os.path.exists(cache_file):
         print("LOADING empathetic_dialogue")
         with open(cache_file, "rb") as f:
             [data_tra, data_val, data_tst, vocab] = pickle.load(f)
