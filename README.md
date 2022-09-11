@@ -1,4 +1,4 @@
-## pretrain cmdline
+## Instructions for the paper
 
 ---
 
