@@ -1,5 +1,6 @@
 import json
 import os
+from tqdm import tqdm
 import torch
 import numpy as np
 from util import config
@@ -162,9 +163,11 @@ def cal_metric(file):
         'beam-bertscore':0,
     }
     ##init metric fun
-    bertscore = BERTScore(device='cuda').to('cuda')
+    bertscore = BERTScore(device='cuda')
 
-    for (emotion,predict,bpredict,ref) in zip(emotions,predicts,beam_predicts,refs):
-        f1 = bertscore(predict,ref)['f1']
+    for i in tqdm(range(0,len(predicts),32)):
+        emotion_batch = emotion_batch[i:i+32]
+        beam_batch = beam_predicts[i:i+32]
+        
         # bert_score = bertscore(predict,ref)
     print(result['bertscore'])

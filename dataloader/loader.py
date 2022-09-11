@@ -86,7 +86,7 @@ def get_commonsense(comet, items):
 
 # to use batch accelerate gen commonsense corpus
 
-
+"""
 def encode_ctx(vocab, items, data_dict, comet):
     # ctx is turns of dialogue
     print(f'start context encoding')
@@ -120,15 +120,13 @@ def encode_ctx(vocab, items, data_dict, comet):
         data_dict["context"].append(ctx_list)
         # emotion word list list
         data_dict["emotion_context"].append(e_list)
-
+"""
 
 def encode_context(vocab, items, data_dict, comet):
-    # items = items[:1024]
     commonsense_item = []
     for ctx in tqdm(items):
         ctx_list = []
         e_list = []
-        # commonsense_list=[]
         for i, c in enumerate(ctx):
             # item is sentence word list
             item = process_sent(c)
@@ -147,15 +145,11 @@ def encode_context(vocab, items, data_dict, comet):
             # only gen last one
             if i == len(ctx) - 1:
                 commonsense_item.append(item)
-                # commonsense_list = get_commonsense(comet, item, data_dict)
-                # commonsense_list = get_commonsense(comet, item)
-        # raw context list
         #commonsense_list : List[5*RelationList[n*GenElement]]
         # data_dict["utt_cs"].append(commonsense_list)
         data_dict["context"].append(ctx_list)
         # emotion word list list
         data_dict["emotion_context"].append(e_list)
-    # batch_items=np.reshape(commonsense_item,[])
 
     for context in tqdm(range(0, len(commonsense_item), 32)):
         chunks = commonsense_item[context:context+32]
