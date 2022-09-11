@@ -1,23 +1,13 @@
 ## pretrain cmdline
 
 ---
-### cem emotion tolerance with 4 gpus
->* `nohup python train.py --model cem --emotion_emb_type tolerance --devices 0,1,2,3 > cem_tolerance.log &`
 
-### cem emotion origin with 4 gpus
->* `nohup python train.py --model cem --emotion_emb_type origin --devices 0,1,2,3 > cem_origin.log &`
-
-### cem emotion order with 4 gpus
->* `nohup python train.py --model cem --emotion_emb_type order --devices 0,1,2,3 > cem_order.log &`
-
-### cem emotion random with 4 gpus
->* `nohup python train.py --model cem --emotion_emb_type order --devices 4,5,6,7 > cem_random.log &`
-
-### empdg emotion origin with 4 gpus
->* `nohup python train.py --model empdg --devices 4,5,6,7 > empdg_origin.log &`
-
-### moel emotion origin with 4 gpus
->* `nohup python train.py --model moel --devices 4,5,6,7 > moel_origin.log &`
-
-### trans emotion origin with 4 gpus
->* `nohup python train.py --model trans --devices 4,5,6,7 > trans_origin.log &`
+1. :bowtie: init
+    - `mkdir best_model predicts`
+    - `mkdir ./data/ED/comet` 
+    - download [comet checkpoint](https://github.com/allenai/comet-atomic-2020) to **comet** directory \
+    <img src='./cache_files/comet_dir.png' width=50/>
+    - `wget http://nlp.stanford.edu/data/glove.6B.zip` to `./vectors`\
+    <img src='./cache_files/vectors.png' width=50/>
+2. run experiment
+    
