@@ -156,8 +156,8 @@ def main():
         trainer.test(model=model, dataloaders=test_loader)
 
 if __name__ == '__main__':
-    # if config.preprocess:
-        # prepare_data_seq()
-    # else:
-        # main()
-    cal_metric('./predicts/trans-origin-results.txt')
+    if config.preprocess:
+        prepare_data_seq()
+    else:
+        main()
+    # cal_metric('./predicts/trans-origin-results.txt')

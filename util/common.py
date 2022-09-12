@@ -173,15 +173,15 @@ def cal_metric(file):
         'beam-meteor':0
     }
     ##init metric fun
-    # bertscore = BERTScore()
-    # for i in tqdm(range(0,len(predicts),32)):
-    #     beam_batch = beam_predicts[i:i+32]
-    #     predict_batch = predicts[i:i+32]
-    #     ref_batch = refs[i:i+32]
+    bertscore = BERTScore()
+    for i in tqdm(range(0,len(predicts),32)):
+        beam_batch = beam_predicts[i:i+32]
+        predict_batch = predicts[i:i+32]
+        ref_batch = refs[i:i+32]
         
-    #     # cur_bert_score = bertscore(predict_batch,ref_batch)['f1']
-    #     result['bertscore'] += sum(bertscore(predict_batch,ref_batch)['f1'])
-    #     result['beam-bertscore'] += sum(bertscore(beam_batch,ref_batch)['f1'])
+        # cur_bert_score = bertscore(predict_batch,ref_batch)['f1']
+        result['bertscore'] += sum(bertscore(predict_batch,ref_batch)['f1'])
+        result['beam-bertscore'] += sum(bertscore(beam_batch,ref_batch)['f1'])
 
     for (context,emotion,ref,pred,beam_pred) in zip(contexts,emotions,refs,predicts,beam_predicts):
         result['meteor'] += meteor_score([nltk.word_tokenize(ref)],nltk.word_tokenize(pred))
@@ -200,7 +200,7 @@ def cal_metric(file):
         result['beam-rouge2'] += rouge_score(beam_pred,ref,rouge_keys='rouge2')['rouge2_fmeasure']
         result['beam-rougeL'] += rouge_score(beam_pred,ref,rouge_keys='rougeL')['rougeL_fmeasure']
         result['beam-rougeLsum'] += rouge_score(beam_pred,ref,rouge_keys='rougeLsum')['rougeLsum_fmeasure']
-    result_list=[(k,float(result[k])) for k in result]
+    result_list=[(k,float(result[k])/len(refs)) for k in result]
     format_metric=tabulate(result_list,headers=["metric","value"],tablefmt='fancy_grid')
     print(format_metric)
     with open(metric_file,'w') as f:
