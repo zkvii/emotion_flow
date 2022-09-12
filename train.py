@@ -13,7 +13,7 @@ from model.trans import Transformer
 from model.MIME.model import MIME
 # from model.moel import MOEL
 # from model.trans import Transformer
-
+from dataloader.EmfLoader import load_emf_dataset
 from util import config
 from model.litcem import CEM
 from torch.nn.init import xavier_normal_
@@ -156,8 +156,10 @@ def main():
         trainer.test(model=model, dataloaders=test_loader)
 
 if __name__ == '__main__':
-    if config.preprocess:
-        prepare_data_seq()
-    else:
-        main()
+    # if config.preprocess:
+        # prepare_data_seq()
+    # else:
+        # main()
     # cal_metric('./predicts/trans-origin-results.txt')
+
+    load_emf_dataset()
