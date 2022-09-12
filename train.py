@@ -19,12 +19,14 @@ from model.litcem import CEM
 from torch.nn.init import xavier_normal_
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning import seed_everything
 import os
 import warnings
 warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
+seed_everything(42)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 from util.common import load_best_path, save_best_hparams,save_best_path
 logger = TensorBoardLogger(
@@ -153,12 +155,9 @@ def main():
             os.remove(file_path)
         trainer.test(model=model, dataloaders=test_loader)
 
-    # if config.machine_metrics and config.mode != 'only_train':
-    #     cal_one_model(file_path)
-
-
 if __name__ == '__main__':
-    if config.preprocess:
-        prepare_data_seq()
-    else:
-        main()
+    # if config.preprocess:
+        # prepare_data_seq()
+    # else:
+        # main()
+    cal_metric('./predicts/trans-origin-results.txt')
