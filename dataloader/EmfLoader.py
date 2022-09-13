@@ -13,7 +13,29 @@ import numpy as np
 import nlpaug.augmenter.char as nac
 import nlpaug.augmenter.word as naw
 import nlpaug.augmenter.sentence as nas
+from nltk import word_tokenize
 
+class EmotionLang:
+    # def __init__(self, name, vocab_size, min_count=1, max_count=100000):
+    #     super(EmotionLang, self).__init__(name, vocab_size, min_count, max_count)
+    #     self.emotion_vocab = self.build_emotion_vocab()
+
+    # def build_emotion_vocab(self):
+    #     emotion_vocab = {}
+    #     for key in emo_map.keys():
+    #         emotion_vocab[key] = len(emotion_vocab)
+    #     return emotion_vocab
+
+    # def get_emotion_vocab(self):
+    #     return self.emotion_vocab
+
+    # def get_emotion_idx(self, emo):
+    #     return self.emotion_vocab[emo]
+
+    # def get_emotion(self, idx):
+    #     for key, value in self.emotion_vocab.items():
+    #         if value == idx:
+    #             return key
 
 def encode_emf(vocab: Lang, files):
     """encode the dataset
@@ -29,8 +51,14 @@ def encode_emf(vocab: Lang, files):
             # emotion_context: list of str
             # context: list of list of str
             # emotion_context = [emo_map[emotion]] + situation
+            
+            situation = process_sent(situation)
+            dialog_context_words = [process_sent(u) for u in dialog]
+            target = process_sent(target)
+
             emotion_context = [emo_map[emotion]] + situation
-            context = []
+
+            # context_emotion = 
             for i, utterance in enumerate(dialog):
                 if i % 2 == 0:
                     context.append([config.USR_idx] + utterance)
@@ -39,7 +67,8 @@ def encode_emf(vocab: Lang, files):
             data["context"].append(context)
             data["target"].append(target)
             data["emotion"].append(emo_map[emotion])
-            data["situation"].append(situation
+            data["situation"].append(situation)
+    
     for file in files:
         for i in range(len(file[0])):
             # context
@@ -68,9 +97,9 @@ def read_emf_files(vocab: Lang):
     dev_files=[np.load(f, allow_pickle=True) for f in files["dev"]]
     test_files=[np.load(f, allow_pickle=True) for f in files["test"]]
     data_train=encode_emf(vocab, train_files)
-    data_dev=encode_emf(vocab, dev_files)
+    data_val=encode_emf(vocab, dev_files)
     data_test=encode_emf(vocab, test_files)
-    return data_tra, data_val, data_tst, vocab
+    return data_train, data_val, data_test, vocab
 
 
 
@@ -84,7 +113,7 @@ def load_emf_dataset():
     if os.path.exists(cache_file):
         print("LOADING PROCESSED EMPATHETIC DIALOGUE DATASET")
         with open(cache_file, "rb") as f:
-            [data_tra, data_val, data_tst, vocab]=pickle.load(f)
+            [data_tra, data_val, data_test, vocab]=pickle.load(f)
     else:
         print("Building dataset...")
 
@@ -104,11 +133,11 @@ def load_emf_dataset():
         emos=[k for k in emo_map.keys()]
         vocab.index_words(emos)
         # not just readfiles but with some modification
-        data_tra, data_val, data_tst, vocab=read_files(
+        data_train, data_val, data_test, vocab=read_emf_files(
             vocab
         )
         with open(cache_file, "wb") as f:
-            pickle.dump([data_tra, data_val, data_tst, vocab], f)
+            pickle.dump([data_train, data_val, data_test, vocab], f)
             print("Saved PICKLE")
 
     for i in range(3):
@@ -118,4 +147,4 @@ def load_emf_dataset():
         print("[target]:", " ".join(data_tra["target"][i]))
         print("[emotion_context]:,", " ".join(data_tra["emotion_context"][i]))
         print('-------------------------')
-    return data_tra, data_val, data_tst, vocab
+    return data_train, data_val, data_test, vocab
