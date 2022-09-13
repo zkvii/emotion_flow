@@ -30,7 +30,14 @@ result:
 | batch_size       |    batch size for train,valid,test    | 
 
 3. :dog: run experiment
-   
+
+    >* `nohup python train.py --model trans --mode train_and_test --batch_size 32 --max_epoch 128 --devices 0 >trans.log&` **trans** training
+    >* `nohup python train.py --model mult --mode train_and_test --batch_size 32 --max_epoch 128 --devices 1 >mult.log&` **mult** training
+    >* `nohup python train.py --model empdg --mode train_and_test --batch_size 32 --max_epoch 128 --devices 2 >empdg.log&` **empdg** training
+    >* `nohup python train.py --model mime --mode train_and_test --batch_size 32 --max_epoch 128 --devices 3 >mime.log&` **mime** training
+    >* `nohup python train.py --model moel --mode train_and_test --batch_size 32 --max_epoch 128 --devices 4 >moel.log&` **moel** training
+    >* `nohup python train.py --model cem --mode train_and_test --batch_size 32 --max_epoch 128 --devices 5 >cem.log&` **cem** training
+    >* `nohup python train.py --model kemp --mode train_and_test --batch_size 32 --max_epoch 128 --devices 6 >kemp.log&` **kemp** training
 4. :mag_right: todo list
    - [ ] run all models
    - [ ] add more params to control

@@ -1,5 +1,6 @@
 import json
 import os
+import nltk
 from tqdm import tqdm
 import torch
 import numpy as np
@@ -12,19 +13,19 @@ from nltk.translate.meteor_score import meteor_score
 from torchmetrics import BLEUScore, CharErrorRate, CHRFScore, ExtendedEditDistance, MatchErrorRate
 from torchmetrics.text.rouge import ROUGEScore
 from nltk.corpus import wordnet
+from tabulate import tabulate
+import pandas as pd
+# def set_seed():
+#     torch.manual_seed(config.seed)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+#     np.random.seed(config.seed)
 
 
-def set_seed():
-    torch.manual_seed(config.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(config.seed)
-
-
-def make_infinite(dataloader):
-    while True:
-        for x in dataloader:
-            yield x
+# def make_infinite(dataloader):
+#     while True:
+#         for x in dataloader:
+#             yield x
 
 
 def get_wordnet_pos(tag):
@@ -40,18 +41,18 @@ def get_wordnet_pos(tag):
         return None
 
 
-def save_config():
-    if not config.test:
-        if not os.path.exists(config.save_path):
-            os.makedirs(config.save_path)
-        with open(config.save_path + "/config.txt", "w") as the_file:
-            for k, v in config.args.__dict__.items():
-                if "False" in str(v):
-                    continue
-                elif "True" in str(v):
-                    the_file.write("--{} ".format(k))
-                else:
-                    the_file.write("--{} {} ".format(k, v))
+# def save_config():
+#     if not config.test:
+#         if not os.path.exists(config.save_path):
+#             os.makedirs(config.save_path)
+#         with open(config.save_path + "/config.txt", "w") as the_file:
+#             for k, v in config.args.__dict__.items():
+#                 if "False" in str(v):
+#                     continue
+#                 elif "True" in str(v):
+#                     the_file.write("--{} ".format(k))
+#                 else:
+#                     the_file.write("--{} {} ".format(k, v))
 
 
 def embedding_similarity(
@@ -130,6 +131,8 @@ def save_best_hparams(model):
 
 
 def cal_metric(file):
+    metric_file=file[:-4]+'_metric.txt'
+    metric_file_csv=file[:-4]+'_metric.csv'
     contexts=[]
     emotions = []
     predicts=[]
@@ -170,7 +173,7 @@ def cal_metric(file):
         'beam-meteor':0
     }
     ##init metric fun
-    bertscore = BERTScore(device='cuda')
+    bertscore = BERTScore()
     for i in tqdm(range(0,len(predicts),32)):
         beam_batch = beam_predicts[i:i+32]
         predict_batch = predicts[i:i+32]
@@ -181,5 +184,28 @@ def cal_metric(file):
         result['beam-bertscore'] += sum(bertscore(beam_batch,ref_batch)['f1'])
 
     for (context,emotion,ref,pred,beam_pred) in zip(contexts,emotions,refs,predicts,beam_predicts):
-        meteor_score_tk = meteor_score([ref],pred)
-    print(result['bertscore'])
+        result['meteor'] += meteor_score([nltk.word_tokenize(ref)],nltk.word_tokenize(pred))
+        result['beam-meteor'] += meteor_score([nltk.word_tokenize(ref)],nltk.word_tokenize(beam_pred))
+        result['bleu1'] += bleu_score(pred,[ref],n_gram=1)
+        result['bleu2'] += bleu_score(pred,[ref],n_gram=2)
+        result['bleu4'] += bleu_score(pred,[ref],n_gram=4)
+        result['beam-bleu1'] += bleu_score(beam_pred,[ref],n_gram=1)
+        result['beam-bleu2'] += bleu_score(beam_pred,[ref],n_gram=2)
+        result['beam-bleu4'] += bleu_score(beam_pred,[ref],n_gram=4)
+        result['rouge1'] += rouge_score(pred,ref,rouge_keys='rouge1')['rouge1_fmeasure']
+        result['rouge2'] += rouge_score(pred,ref,rouge_keys='rouge2')['rouge2_fmeasure']
+        result['rougeL'] += rouge_score(pred,ref,rouge_keys='rougeL')['rougeL_fmeasure']
+        result['rougeLsum'] += rouge_score(pred,ref,rouge_keys='rougeLsum')['rougeLsum_fmeasure']
+        result['beam-rouge1'] += rouge_score(beam_pred,ref,rouge_keys='rouge1')['rouge1_fmeasure']
+        result['beam-rouge2'] += rouge_score(beam_pred,ref,rouge_keys='rouge2')['rouge2_fmeasure']
+        result['beam-rougeL'] += rouge_score(beam_pred,ref,rouge_keys='rougeL')['rougeL_fmeasure']
+        result['beam-rougeLsum'] += rouge_score(beam_pred,ref,rouge_keys='rougeLsum')['rougeLsum_fmeasure']
+    result_list=[(k,float(result[k])/len(refs)) for k in result]
+    format_metric=tabulate(result_list,headers=["metric","value"],tablefmt='fancy_grid')
+    print(format_metric)
+    with open(metric_file,'w') as f:
+        f.write(format_metric)
+    
+    df=pd.DataFrame(result_list,columns=['metric','value'])
+    df.to_csv(metric_file_csv,index=False)
+    print(format_metric)
