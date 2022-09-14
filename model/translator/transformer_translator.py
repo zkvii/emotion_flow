@@ -270,7 +270,7 @@ class Translator(object):
         for d in batch_hyp:
             ret_sentences.append(
                 " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace(
-                    "EOS", ""
+                    "<EOS>", ""
                 )
             )
 

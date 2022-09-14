@@ -26,7 +26,6 @@ warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
-seed_everything(42)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 seed_everything(42)
 from util.common import load_best_path, save_best_hparams,save_best_path

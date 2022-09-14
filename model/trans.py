@@ -444,7 +444,7 @@ class Transformer(LightningModule):
         emb_mask = self.embedding(batch["input_mask"])
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
-        # Decode
+        # Decode input [batch_size, dec_max_len] start with <sos>
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0)).unsqueeze(1)
         ).to(dec_batch.device)

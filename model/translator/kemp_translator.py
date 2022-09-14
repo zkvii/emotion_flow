@@ -120,6 +120,12 @@ class Translator(object):
                 ## masking
                 mask_trg = dec_seq.data.eq(config.PAD_idx).unsqueeze(1)
                 mask_src = torch.cat([mask_src[0].unsqueeze(0)] * mask_trg.size(0), 0)
+                # out, attn_dist, _ = self.decoder(inputs=ys_emb,
+                #                                  encoder_output=encoder_outputs,
+                #                                  mask=(mask_src, mask_trg),
+                #                                  pred_emotion=None,
+                #                                  emotion_contexts=emotion_context,
+                #                                  context_vad=src_vad)
                 dec_output, attn_dist,_ = self.model.decoder(
                     self.model.embedding(dec_seq), enc_output, (mask_src, mask_trg)
                 )
@@ -229,7 +235,9 @@ class Translator(object):
             n_bm = self.beam_size
             n_inst, len_s, d_h = src_enc.size()
             src_batch=src_seq
+            # src_seq = [n_bm(5),seq_len]
             src_seq = enc_batch.repeat(1, n_bm).view(n_inst * n_bm, len_s)
+            # src_en = [n_bm(5),seq_len,hidden_size]
             src_enc = src_enc.repeat(1, n_bm, 1).view(n_inst * n_bm, len_s, d_h)
 
             # -- Prepare beams
@@ -275,12 +283,13 @@ class Translator(object):
                     active_inst_idx_list,
                 )
 
+        #decode the last step
         batch_hyp, batch_scores = collect_hypothesis_and_scores(inst_dec_beams, 1)
 
         ret_sentences = []
         for d in batch_hyp:
             ret_sentences.append(
-                " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace("<EOS>,"")
+                " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace("<EOS>","")
             )
 
         return ret_sentences  # , batch_scores
