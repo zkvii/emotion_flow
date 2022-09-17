@@ -15,6 +15,7 @@ class Translator(object):
         self.device = self.model.device
 
     def beam_search(self, src_seq, max_dec_step):
+        # src_seq: dict[batch]
         """ Translation work in one batch """
 
         def get_inst_idx_to_tensor_position_map(inst_idx_list):

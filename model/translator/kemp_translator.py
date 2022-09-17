@@ -14,6 +14,7 @@ class Translator(object):
         self.beam_size = config.beam_size
         self.device = self.model.device
 
+        self.ys_emb=None
     def beam_search(self, src_seq, max_dec_step):
         """ Translation work in one batch """
 
@@ -83,6 +84,9 @@ class Translator(object):
             encoder_db,
             mask_transformer_db,
             DB_ext_vocab_batch,
+            emotion_context,
+            src_vad,
+            # ys_emb
         ):
             """ Decode and update beam status, and then return active beam idx """
 
@@ -116,32 +120,31 @@ class Translator(object):
                 encoder_db,
                 mask_transformer_db,
                 DB_ext_vocab_batch,
+                emotion_context,
+                src_vad,
+                # ys_emb
             ):
                 ## masking
                 mask_trg = dec_seq.data.eq(config.PAD_idx).unsqueeze(1)
                 mask_src = torch.cat([mask_src[0].unsqueeze(0)] * mask_trg.size(0), 0)
-                # out, attn_dist, _ = self.decoder(inputs=ys_emb,
-                #                                  encoder_output=encoder_outputs,
-                #                                  mask=(mask_src, mask_trg),
-                #                                  pred_emotion=None,
-                #                                  emotion_contexts=emotion_context,
-                #                                  context_vad=src_vad)
-                dec_output, attn_dist,_ = self.model.decoder(
-                    self.model.embedding(dec_seq), enc_output, (mask_src, mask_trg)
-                )
-
-                concept_input = src_batch["concept_batch"]  # (bsz, max_concept_len)
-                concept_ext_input = src_batch["concept_ext_batch"]
-                enc_batch_extend_vocab = src_batch["input_ext_batch"]
-                if concept_input.size()[0] != 0 and config.model != 'wo_ECE':
-                    enc_ext_batch = torch.cat(
-                    (enc_batch_extend_vocab, concept_ext_input), dim=1)
+                # dec_output, attn_dist = self.model.decoder(
+                #     self.model.embedding(dec_seq), enc_output, (mask_src, mask_trg)
+                # )
+                # ys_emb = ys_emb.repeat(n_bm,1).reshape()
+                if config.project:
+                    decoder_out, attn_dist, _ = self.model.decoder(self.embedding_proj_in(
+                        dec_seq), self.model.embedding_proj_in(src_enc), (mask_src, mask_trg))
                 else:
-                    enc_ext_batch = enc_batch_extend_vocab
-                db_dist = None
+                    decoder_out, attn_dist, _ = self.model.decoder(inputs=self.ys_emb,
+                                                    encoder_output=src_enc,
+                                                    mask=(mask_src, mask_trg),
+                                                    pred_emotion=None,
+                                                    emotion_contexts=emotion_context,
+                                                    context_vad=src_vad)
+                    db_dist = None
 
                 # prob = self.model.generator(
-                #     dec_output,
+                #     decoder_out,
                 #     attn_dist,
                 #     enc_batch_extend_vocab,
                 #     extra_zeros,
@@ -150,10 +153,19 @@ class Translator(object):
                 #     attn_dist_db=db_dist,
                 # )
 
-                prob = self.model.generator(dec_output, None, None, attn_dist, enc_ext_batch if config.pointer_gen else None, extra_zeros)
+                prob = self.model.generator(
+                # decoder_out, None, None, attn_dist, enc_ext_batch if config.pointer_gen else None, extra_zeros)
+                decoder_out, None, None, attn_dist, None if config.pointer_gen else None, extra_zeros)
                 # prob = F.log_softmax(prob,dim=-1) #fix the name later
-                word_prob = prob[:, -1]
+                # prob=prob.unsqueeze
+                word_prob = prob
+
+                _, next_words = torch.max(prob[:, -1], dim=1)
                 word_prob = word_prob.view(n_active_inst, n_bm, -1)
+                temp_embeding=self.model.embedding(next_words.unsqueeze(1))
+                self.ys_emb=torch.cat([self.ys_emb,temp_embeding],dim=1)
+                # ys_emb = torch.cat((ys_emb, self.embedding(torch.ones(1, 1).long().fill_(next_word).to(self.device))), dim=1)
+                
                 return word_prob
 
             def collect_active_inst_idx_list(
@@ -185,6 +197,9 @@ class Translator(object):
                 encoder_db,
                 mask_transformer_db,
                 DB_ext_vocab_batch,
+                emotion_context,
+                src_vad,
+                # ys_emb
             )
 
             # Update the beam with predicted word prob information and collect incomplete instances
@@ -210,7 +225,7 @@ class Translator(object):
         with torch.no_grad():
             # -- Encode
             (
-                enc_batch,
+                batch_data,
                 _,
                 _,
                 enc_batch_extend_vocab,
@@ -219,12 +234,63 @@ class Translator(object):
                 _,
             ) = get_input_from_batch(src_seq)
 
-            mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
+            (enc_batch,enc_vad_batch, concept_input, concept_ext_input, concept_vad_batch,oovs,max_oov_length,input_mask)=batch_data
+           
 
-            emb_mask = self.model.embedding(src_seq["input_mask"])
-            src_enc = self.model.encoder(
-                self.model.embedding(enc_batch) + emb_mask, mask_src
-            )
+            emb_mask = self.model.embedding(input_mask)
+            mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(
+                1)  # (bsz, src_len)->(bsz, 1, src_len)
+            src_emb = self.model.embedding(enc_batch) + emb_mask
+            src_vad = enc_vad_batch  # (bsz, len, 1)
+
+            if config.model != 'wo_ECE':  # emotional context graph encoding
+                if concept_input.size()[0] != 0:
+                    mask_con = concept_input.data.eq(
+                        config.PAD_idx).unsqueeze(1)  # real mask
+                    con_mask = self.model.embedding(
+                        src_seq["concept_mask"])  # dialogue state
+                    con_emb = self.model.embedding(concept_input) + con_mask
+
+                    # Knowledge Update
+                    src_emb = self.model.concept_graph(src_emb, con_emb,
+                                                src_seq["adjacency_mask_batch"])  # (bsz, context+concept, emb_dim)
+                    # (bsz, 1, context+concept)
+                    mask_src = torch.cat((mask_src, mask_con), dim=2)
+
+                    src_vad = torch.cat(
+                        (enc_vad_batch, concept_vad_batch), dim=1)  # (bsz, len)
+            encoder_outputs = self.model.encoder(
+                src_emb, mask_src)  # (bsz, src_len, emb_dim)
+
+            # Identify
+            src_vad = torch.softmax(src_vad, dim=-1)
+            emotion_context_vad = src_vad.unsqueeze(2)
+            emotion_context_vad = emotion_context_vad.repeat(
+                1, 1, config.emb_dim)  # (bsz, len, emb_dim)
+            emotion_context = torch.sum(
+                emotion_context_vad * encoder_outputs, dim=1)  # c_e (bsz, emb_dim)
+            emotion_contexts = emotion_context_vad * encoder_outputs
+
+            emotion_logit = self.model.identify(emotion_context)  # (bsz, emotion_num)
+
+            if concept_input.size()[0] != 0 and config.model != 'wo_ECE':
+                enc_ext_batch = torch.cat(
+                    (enc_batch_extend_vocab, concept_ext_input), dim=1)
+            else:
+                enc_ext_batch = enc_batch_extend_vocab
+
+            # ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
+            ys_emb = self.model.emotion_embedding(
+                emotion_logit).unsqueeze(1)  # (bsz, 1, emb_dim)
+            # sos_emb = ys_emb
+            # if config.USE_CUDA:
+                # ys = ys.cuda()
+            # mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
+
+            src_enc=encoder_outputs
+            # src_enc = self.model.encoder(
+            #     self.model.embedding(enc_batch) + emb_mask, mask_src
+            # )
 
             encoder_db = None
 
@@ -234,12 +300,12 @@ class Translator(object):
             # -- Repeat data for beam search
             n_bm = self.beam_size
             n_inst, len_s, d_h = src_enc.size()
-            src_batch=src_seq
-            # src_seq = [n_bm(5),seq_len]
-            src_seq = enc_batch.repeat(1, n_bm).view(n_inst * n_bm, len_s)
-            # src_en = [n_bm(5),seq_len,hidden_size]
+            #beam src_seq
+            src_seq = enc_ext_batch.repeat(1, n_bm).view(n_inst * n_bm, len_s)
+            #beam encode_output
             src_enc = src_enc.repeat(1, n_bm, 1).view(n_inst * n_bm, len_s, d_h)
-
+            #ys_emb
+            ys_emb = ys_emb.repeat(1, n_bm,1).view(n_inst*n_bm,1,-1)
             # -- Prepare beams
             inst_dec_beams = [Beam(n_bm, device=self.device) for _ in range(n_inst)]
 
@@ -248,7 +314,7 @@ class Translator(object):
             inst_idx_to_position_map = get_inst_idx_to_tensor_position_map(
                 active_inst_idx_list
             )
-
+            self.ys_emb=ys_emb
             # -- Decode
             for len_dec_seq in range(1, max_dec_step + 1):
 
@@ -265,6 +331,9 @@ class Translator(object):
                     encoder_db,
                     mask_transformer_db,
                     DB_ext_vocab_batch,
+                    emotion_context,
+                    src_vad,
+                    # ys_emb
                 )
 
                 if not active_inst_idx_list:
@@ -283,13 +352,14 @@ class Translator(object):
                     active_inst_idx_list,
                 )
 
-        #decode the last step
         batch_hyp, batch_scores = collect_hypothesis_and_scores(inst_dec_beams, 1)
 
         ret_sentences = []
         for d in batch_hyp:
             ret_sentences.append(
-                " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace("<EOS>","")
+                " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace(
+                    "<EOS>", ""
+                )
             )
 
         return ret_sentences  # , batch_scores
@@ -309,18 +379,28 @@ def sequence_mask(sequence_length, max_len=None):
 
 
 def get_input_from_batch(batch):
+
+    enc_batch_extend_vocab, extra_zeros = None, None
     enc_batch = batch["input_batch"]
+    enc_vad_batch = batch['input_vad']
+
+    enc_batch_extend_vocab = batch["input_ext_batch"]
+    concept_input = batch["concept_batch"]  # (bsz, max_concept_len)
+    concept_ext_input = batch["concept_ext_batch"]
+    concept_vad_batch = batch['concept_vad_batch']
+    input_mask= batch['input_mask']
+    oovs = batch["oovs"]
+    max_oov_length = len(
+        sorted(oovs, key=lambda i: len(i), reverse=True)[0])
+    # enc_batch = batch["input_batch"]
     enc_lens = batch["input_lengths"]
     batch_size, max_enc_len = enc_batch.size()
     assert enc_lens.size(0) == batch_size
 
     enc_padding_mask = sequence_mask(enc_lens, max_len=max_enc_len).float()
 
-    extra_zeros = None
-    enc_batch_extend_vocab = None
-
     if config.pointer_gen:
-        enc_batch_extend_vocab = batch["input_ext_vocab_batch"]
+        enc_batch_extend_vocab = batch["input_ext_batch"]
         # max_art_oovs is the max over all the article oov list in the batch
         if batch["max_art_oovs"] > 0:
             extra_zeros = torch.zeros((batch_size, batch["max_art_oovs"]))
@@ -338,7 +418,7 @@ def get_input_from_batch(batch):
     c_t_1.to(enc_batch.device)
 
     return (
-        enc_batch,
+        (enc_batch,enc_vad_batch, concept_input, concept_ext_input, concept_vad_batch,oovs,max_oov_length,input_mask),
         enc_padding_mask,
         enc_lens,
         enc_batch_extend_vocab,

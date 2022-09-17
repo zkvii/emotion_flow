@@ -8,6 +8,7 @@ import os
 import re
 import pandas as pd
 from tabulate import tabulate
+from tqdm import tqdm
 
 def _get_ngrams(segment, max_order):
     """Extracts all n-grams upto a given maximum order from an input segment.
@@ -44,7 +45,7 @@ def _compute_bleu(reference_corpus, translation_corpus, max_order=4, smooth=Fals
     possible_matches_by_order = [0] * max_order
     reference_length = 0
     translation_length = 0
-    
+
     for (references, translation) in zip(reference_corpus, translation_corpus):
         reference_length += min(len(r) for r in references)
         translation_length += len(translation)
@@ -117,27 +118,26 @@ def get_dist(res):
     return ma_dist1, ma_dist2, mi_dist1, mi_dist2, avg_len
 
 
-
 def cal_one_model(file, opt=''):
-    if opt!='':
+    if opt != '':
         opt_f = open(opt, 'w')
     else:
-        opt_f = open(file.rstrip('.txt')+'_metric.txt', 'w')
+        opt_f = open(file.rstrip('.txt')+'_metric_old.txt', 'w')
 
     # print(file)
     # opt_f.write(file +'\n')
-    result={'experiment':file.rstrip('.txt')}
+    result = {'experiment': file.rstrip('.txt')}
     # result={}
     with open(file, 'r') as f:
         target = []
         pred = []
-        beam_preds=[]
+        beam_preds = []
 
         res = {}
-        beam_res={}
+        beam_res = {}
         itr = 0
-        beam_iter=0
-        for line in f.readlines():
+        beam_iter = 0
+        for line in tqdm(f.readlines()):
             if line.startswith('Pred:'):
                 p = line.strip('Pred:').strip()
                 pls = p.split()
@@ -153,52 +153,56 @@ def cal_one_model(file, opt=''):
                 b = line.strip('Beam:').strip()
                 bls = b.split()
                 beam_preds.append(bls)
-                beam_res[beam_iter]=bls
-                beam_iter+=1
+                beam_res[beam_iter] = bls
+                beam_iter += 1
 
         bleu1 = _compute_bleu(target, pred, max_order=1)
         bleu2 = _compute_bleu(target, pred, max_order=2)
         bleu4 = _compute_bleu(target, pred, max_order=4)
-
-        bbleu1=_compute_bleu(target, beam_preds, max_order=1)
-        bbleu2=_compute_bleu(target, beam_preds, max_order=2)
-        bbleu4=_compute_bleu(target, beam_preds, max_order=4)
-        result.update( {
-            "bleu1": round(bleu1[0]*100,2),
-            "bleu2": round(bleu2[0]*100,2),
-            "bleu4": round(bleu4[0]*100,2),
-            "bbleu1": round(bbleu1[0]*100,2),
-            "bbleu2": round(bbleu2[0]*100,2),
-            "bbleu4": round(bbleu4[0]*100,2)
+        if len(beam_preds) > 0:
+            bbleu1 = _compute_bleu(target, beam_preds, max_order=1)
+            bbleu2 = _compute_bleu(target, beam_preds, max_order=2)
+            bbleu4 = _compute_bleu(target, beam_preds, max_order=4)
+            result.update({'beam_bleu1': round(bbleu1[0]*100, 2), 'beam_bleu2': round(
+                bbleu2[0]*100, 2), 'beam_bleu4': round(bbleu4[0]*100, 2)})
+        result.update({
+            "bleu1": round(bleu1[0]*100, 2),
+            "bleu2": round(bleu2[0]*100, 2),
+            "bleu4": round(bleu4[0]*100, 2),
         })
 
     ma_dist1, ma_dist2, mi_dist1, mi_dist2, avg_len = get_dist(res)
-    
-    beam_ma_dist1, beam_ma_dist2, beam_mi_dist1, beam_mi_dist2, beam_avg_len = get_dist(beam_res)
+    if len(beam_res) > 0:
+        beam_ma_dist1, beam_ma_dist2, beam_mi_dist1, beam_mi_dist2, beam_avg_len = get_dist(
+            beam_res)
+        result.update(
+            {
+
+                "beam_ma_dist1": beam_ma_dist1,
+                "beam_ma_dist2": beam_ma_dist2,
+                "beam_mi_dist1": beam_mi_dist1,
+                "beam_mi_dist2": beam_mi_dist2,
+                "beam_avg_len": beam_avg_len,
+            }
+        )
     result.update({
-        "ma_dist1":ma_dist1,
-        "ma_dist2":ma_dist2,
-        "mi_dist1":mi_dist1,
-        "mi_dist2":mi_dist2,
-        "avg_len":avg_len,
-        "beam_ma_dist1":beam_ma_dist1,
-        "beam_ma_dist2":beam_ma_dist2,
-        "beam_mi_dist1":beam_mi_dist1,
-        "beam_mi_dist2":beam_mi_dist2,
-        "beam_avg_len":beam_avg_len,
+        "ma_dist1": ma_dist1,
+        "ma_dist2": ma_dist2,
+        "mi_dist1": mi_dist1,
+        "mi_dist2": mi_dist2,
+        "avg_len": avg_len,
     })
-    result_list=[(k,result[k]) for k in result]
-    format_metric=tabulate(result_list,headers=["metric","value"],tablefmt='fancy_grid')
+    result_list = [(k, result[k]) for k in result]
+    format_metric = tabulate(result_list, headers=[
+                             "metric", "value"], tablefmt='fancy_grid')
     print(format_metric)
     opt_f.write(format_metric)
 
-    df=pd.DataFrame(result,index=[0])
-    df['Dist-1']=mi_dist1*100
-    df['Dist-2']=mi_dist2*100
-    df.to_csv(file.rstrip('.txt')+'_metric.csv',index=False)
-
+    df = pd.DataFrame(result, index=[0])
+    df['Dist-1'] = mi_dist1*100
+    df['Dist-2'] = mi_dist2*100
+    df.to_csv(file.rstrip('.txt')+'_metric_old.csv', index=False)
 
 
 if __name__ == '__main__':
-    cal_one_model('./predicts/trans-origin-results.txt')
-
+    cal_one_model('./predicts/kemp-origin-results.txt')

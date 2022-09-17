@@ -628,7 +628,7 @@ class KEMP(LightningModule):
         self.log('test_acc', acc)
         sent_g = self.decoder_greedy(batch)
         t = Translator(self, self.vocab)
-        sent_b = t.beam_search(batch, max_dec_step=config.max_dec_step)
+        # sent_b = t.beam_search(batch, max_dec_step=config.max_dec_step)
         ref, hyp_g = [], []
         for i, greedy_sent in enumerate(sent_g):
             rf = " ".join(batch["target_txt"][i])
@@ -641,7 +641,7 @@ class KEMP(LightningModule):
                 [" ".join(s) for s in batch['input_txt'][i]]))
             # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
             outputs.write("Pred:{} \n".format(greedy_sent))
-            outputs.write(f"Beam:{sent_b[i]} \n")
+            # outputs.write(f"Beam:{sent_b[i]} \n")
             outputs.write("Ref:{} \n".format(rf))
 
         return loss

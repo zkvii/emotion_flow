@@ -14,15 +14,15 @@
             "args": [
                 // "--preprocess"
                 "--model",
-                "kemp",
+                "mime",
                 "--devices",
                 "0",
                 "--batch_size",
                 "32",
                 "--mode",
-                "only_test",
+                "only_train",
                 "--max_epoch",
-                "1",
+                "128",
                 "--emotion_emb_type",
                 "origin",
             ]
