@@ -22,9 +22,9 @@
                 "--mode",
                 "train_and_test",
                 "--max_epoch",
-                "1",
+                "2",
                 "--emotion_emb_type",
-                "tolerance",
+                "origin",
                 "--code_check"
             ]
         }

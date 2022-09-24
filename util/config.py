@@ -79,12 +79,16 @@ parser.add_argument("--attn_loss",action="store_true",help="emotion loss")
 # transformer
 parser.add_argument("--hop", type=int, default=1)
 parser.add_argument("--heads", type=int, default=2)
+parser.add_argument("--enc_layers", type=int, default=2)
+parser.add_argument("--dec_layers", type=int, default=2)
+parser.add_argument("--pf_dim", type=int, default=512)
 parser.add_argument("--depth", type=int, default=40)
+parser.add_argument("--scale_emb",default=True, action="store_true")
+parser.add_argument("--scale_proj",default=True, action="store_true")
 parser.add_argument("--filter", type=int, default=50)
 parser.add_argument("--max_seq_length", type=int, default=1000)
 parser.add_argument("--dropout", type=float, default=0.2)
 parser.add_argument("--devices", type=str, default='0')
-
 # concept
 parser.add_argument("--concept_num", type=int, default=3,
                     help='the maximum number of external concepts injection for a word.')
@@ -152,8 +156,13 @@ attn_loss = args.attn_loss
 hop = args.hop
 heads = args.heads
 depth = args.depth
+pf_dim = args.pf_dim
+scale_emb=args.scale_emb
+scale_proj=args.scale_proj
 filter = args.filter
 max_dec_step = args.max_dec_step
+enc_layers=args.enc_layers
+dec_layers=args.dec_layers
 
 label_smoothing = args.label_smoothing
 weight_sharing = args.weight_sharing

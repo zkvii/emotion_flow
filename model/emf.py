@@ -1,4 +1,5 @@
 import imp
+from turtle import forward
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
@@ -7,6 +8,8 @@ from util import config
 import math
 import torch.nn.functional as F
 import numpy as np
+
+
 
 
 class PositionalEncoding(LightningModule):
@@ -36,20 +39,20 @@ class PositionalEncoding(LightningModule):
         return x + self.pos_table[:, :x.size(1)].clone().detach()
 
 
-class Gennerator(LightningModule):
-    def __init__(self, hidden_dim: int, output_dim: int):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.linear = nn.Linear(hidden_dim, output_dim)
-        self.softmax = nn.Softmax(dim=-1)
-        # self.log_softmax = nn.LogSoftmax(dim=1)
-        # self.loss = nn.NLLLoss()
+class LinearPosionEncoding(LightningModule):
+    def __init__(self,max_len,hid_dim):
+        super(LinearPosionEncoding,self).__init__()
+        #sin cos position encoding
+        # self.pe = nn.Embedding(max_len,hid_dim)
+        # self.pe.weight.data = self._get_sinusoid_encoding_table(max_len,hid_dim)
+        # self.pe.weight.requires_grad = False
+        self.pos_emb = nn.Embedding(max_len,hid_dim)
+    def forward(self,x):
+        pos = torch.arange(0,x.size(1)).unsqueeze(0).repeat(x.size(0),1).to(x.device)
+        return x + self.pos_emb(pos)
+        # return self.pos_emb(x)
+    
 
-    def forward(self, x):
-        x = self.linear(x)
-        x = self.softmax(x)
-        return x
 
 
 class ScaledDotProductAttention(LightningModule):
@@ -91,7 +94,7 @@ class MultiHeadAttention(LightningModule):
         super().__init__()
 
         self.n_head = n_head
-        self.head_dim=hid_dim//n_head
+        self.head_dim = hid_dim//n_head
         # hid_dim could not equal to n_head * key_dim
         self.fc_q = nn.Linear(hid_dim, n_head * self.head_dim, bias=False)
         self.fc_k = nn.Linear(hid_dim, n_head * self.head_dim, bias=False)
@@ -116,13 +119,12 @@ class MultiHeadAttention(LightningModule):
         Q = self.fc_q(query).view(batch_size, query_len,
                                   self.n_head, self.head_dim).transpose(1, 2)
         K = self.fc_k(key).view(batch_size, key_len,
-                                self.n_head,self.head_dim).transpose(1, 2)
+                                self.n_head, self.head_dim).transpose(1, 2)
         V = self.fc_v(value).view(batch_size, val_len,
-                                  self.n_head,self.head_dim).transpose(1, 2)
+                                  self.n_head, self.head_dim).transpose(1, 2)
 
-
-        if mask is not None:
-            mask = mask.unsqueeze(1)   # For head axis broadcasting.
+        # if mask is not None:
+        #     mask = mask.unsqueeze(1)   # For head axis broadcasting.
 
         out, attn = self.attention(Q, K, V, mask=mask)
         #attn = torch.softmax(attn, dim=-1)
@@ -156,11 +158,11 @@ class MultiHeadAttentionMutual(LightningModule):
         :param val_dim: dimension of value
         '''
         super().__init__()
-        #if hid_dim is not None,then query,key,value hid_dim is hid_dim
+        # if hid_dim is not None,then query,key,value hid_dim is hid_dim
         query_hid_dim = hid_dim if query_hid_dim is None else query_hid_dim
         key_hid_dim = hid_dim if key_hid_dim is None else key_hid_dim
         val_hid_dim = hid_dim if val_hid_dim is None else val_hid_dim
-        
+
         self.n_head = n_head
         self.key_dim = key_dim
         self.val_dim = val_dim
@@ -219,8 +221,8 @@ class PositionwiseFeedForward(LightningModule):
     def __init__(self, hid_dim, pf_dim, dropout=0.1):
         super().__init__()
         self.fc_1 = nn.Linear(hid_dim, pf_dim)  # position-wise
-        self.fc_2 = nn.Linear(hid_dim, pf_dim)  # position-wise
-        self.layer_norm = nn.LayerNorm(pf_dim, eps=1e-6)
+        self.fc_2 = nn.Linear(pf_dim, hid_dim)  # position-wise
+        self.layer_norm = nn.LayerNorm(hid_dim, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -257,14 +259,14 @@ class Encoder(nn.Module):
 
     def __init__(
             self, input_dim, hid_dim, n_layers, n_head,
-            pf_dim, dropout=0.1, max_len=1000, scale_emb=False):
+            pf_dim, dropout=0.1, max_len=config.max_seq_length,
+             scale_emb=False):
 
         super().__init__()
 
         self.src_word_emb = nn.Embedding(
             input_dim, hid_dim, padding_idx=config.PAD_idx)
-        self.position_enc = PositionalEncoding(
-            hid_dim, n_position=max_len)
+        self.position_enc = LinearPosionEncoding(max_len=max_len,hid_dim=hid_dim)
         self.dropout = nn.Dropout(dropout)
         self.enc_layers = nn.ModuleList([
             EncoderLayer(hid_dim, pf_dim, n_head, dropout=dropout)
@@ -330,14 +332,13 @@ class Decoder(nn.Module):
 
     def __init__(
         self, output_dim, hid_dim, n_layers, n_head,
-            pf_dim, pad_idx, n_position=200, dropout=0.1, scale_emb=False):
+            pf_dim, max_len=config.max_seq_length, dropout=0.1, scale_emb=False):
 
         super().__init__()
 
         self.trg_word_emb = nn.Embedding(
-            output_dim, hid_dim, padding_idx=pad_idx)
-        self.position_enc = PositionalEncoding(
-            hid_dim, n_position=n_position)
+            output_dim, hid_dim, padding_idx=config.PAD_idx)
+        self.position_enc = LinearPosionEncoding(max_len=max_len,hid_dim=hid_dim)
         self.dropout = nn.Dropout(p=dropout)
         self.dec_layers = nn.ModuleList([
             DecoderLayer(hid_dim, pf_dim, n_head, dropout=dropout)
@@ -370,58 +371,91 @@ class Decoder(nn.Module):
             return dec_output, dec_slf_attn_list, dec_enc_attn_list
         return dec_output,
 
+class Generator(LightningModule):
+    def __init__(self, hid_dim, output_dim,dropout=0.1):
+        super().__init__()
+        self.proj = nn.Linear(hid_dim, output_dim)
+        # self.dropout = nn.Dropout(dropout)
+    def forward(self, x):
+        x = self.proj(x)
+            # x=self.dropout(x)
+        return F.log_softmax(x, dim=-1)
 
 class EMF(LightningModule):
     def __init__(self, vocab: Lang):
         super(EMF, self).__init__()
         self.vocab = vocab
         # self.encoder = Encoder()
+        # embdim in most cases is the same as hid_dim
+        #'emb': multiply \sqrt{d_model} to embedding output
+        #'prj': multiply (\sqrt{d_model} ^ -1) to linear projection output
+        
         self.encoder = Encoder(
-            input_dim=vocab.n_words
+            input_dim=vocab.n_words,
+            hid_dim=config.hidden_dim,
+            n_layers=config.enc_layers,
+            n_head=config.heads,
+            pf_dim=config.pf_dim,
+            dropout=config.dropout,
+            scale_emb=config.scale_emb
         )
 
-    def create_mask(self, src, tgt, batch_first: bool = True):
-        if not batch_first:
-            src = src.transpose(0, 1)
-            tgt = tgt.transpose(0, 1)
-        src_seq_len = src.size(1)
-        tgt_seq_len = tgt.size(1)
+        self.decoder = Decoder(
+            output_dim=vocab.n_words,
+            hid_dim=config.hidden_dim,
+            n_layers=config.dec_layers,
+            n_head=config.heads,
+            pf_dim=config.pf_dim,
+            dropout=config.dropout,
+            scale_emb=config.scale_emb
+        )
+        self.generator = Generator(config.hidden_dim, vocab.n_words,dropout=config.dropout)
+    
+        #if config.share_emb:
+        #    self.trg_word_prj.weight = self.encoder.src_word_emb.weight
+        #    self.x_logit_scale = (config.hidden_dim ** -0.5)
+        #else:
+        #self.x_logit_scale = 1
 
-        tgt_mask = nn.Transformer.generate_square_subsequent_mask(
-            tgt_seq_len).to(self.device)
-        src_mask = torch.zeros((src_seq_len, src_seq_len),
-                               device=self.device).type(torch.bool)
-
-        src_padding_mask = (src == config.PAD_idx)
-        tgt_padding_mask = (tgt == config.PAD_idx)
-        return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
+    def make_src_mask(self, src,batch_first=True):
+        #src = [batch size, src len]
+        src_mask = (src != config.PAD_idx).unsqueeze(1).unsqueeze(2)
+        #src_mask = [batch size, 1, 1, src len]
+        return src_mask
+    
+    def make_trg_mask(self, trg):
+        #trg = [batch size, trg len]
+        
+        trg_pad_mask = (trg != config.PAD_idx).unsqueeze(1).unsqueeze(2)
+        #trg_pad_mask = [batch size, 1, 1, trg len]
+        trg_len = trg.shape[1]
+        trg_sub_mask = torch.tril(torch.ones((trg_len, trg_len), device = self.device)).bool()
+        #trg_sub_mask = [trg len, trg len]
+        trg_mask = trg_pad_mask & trg_sub_mask
+        #trg_mask = [batch size, 1, trg len, trg len]
+        
+        return trg_mask
 
     def forward(self, input_batch, target_batch, target_program):
         # divide data
         ref_batch = target_batch[:, 1:]
         target_batch = target_batch[:, :-1]
-        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = self.create_mask(
-            input_batch, target_batch)
+        src_mask = self.make_src_mask(input_batch)
+        trg_mask = self.make_trg_mask(target_batch)
         # encode
-        context = self.context_embedding(input_batch)
-        # context = self.position_embedding(context)
-        context = self.dropout(context)
-        context = self.transformer_encoder(context, src_mask, src_padding_mask)
-        # decode
-        target = self.context_embedding(target_batch)
-        # target = self.position_embedding(target)
-        target = self.dropout(target)
-        output = self.transformer_decoder(target, context, tgt_mask)
-        # output = self.dropout(output)
-        # output = self.linear(output)
-        output = self.generator(output)
+        enc_output,*_= self.encoder(input_batch, src_mask)
+        dec_output,*_= self.decoder(target_batch, trg_mask, enc_output, src_mask)
+
+        output = self.generator(dec_output)
         loss = F.nll_loss(output.contiguous().view(-1, output.size(-1)),
                           ref_batch.contiguous().view(-1),
                           ignore_index=config.PAD_idx)
         return loss
 
     def init_weights(self) -> None:
-        pass
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def get_input_batch(self, batch):
         input_batch = batch['input_batch']
@@ -451,25 +485,32 @@ class EMF(LightningModule):
 
         input_batch, input_mask, target_batch, target_program = self.get_input_batch(
             batch)
-        trg_tensors = self.decoder_greedy(input_batch, max_length=1000)
+        trg_tensor = self.decoder_greedy(input_batch, max_length=1000)
+        trg_tensor = trg_tensor.squeeze().cpu().numpy()
+        decoded_words = [self.vocab.index2word[idx.item()] for idx in trg_tensor]
+        print(decoded_words)
         pass
 
     def decoder_greedy(self, input_batch, max_length):
-        context = self.context_embedding(input_batch)
+        #trg_tensor = [batch size, trg len - 1]
         trg_tensor = torch.zeros(
             (input_batch.size(0), max_length)).long().to(self.device)
         trg_tensor[:, 0] = config.SOS_idx
+
+        src_mask = self.make_src_mask(input_batch)
+        context,*_ = self.encoder(input_batch, src_mask)
         for i in range(1, max_length):
-            src_mask, trg_mask, src_padding_mask, tgt_padding_mask = self.create_mask(
-                input_batch, trg_tensor)
-            output = self.transformer_decoder(
-                self.context_embedding(trg_tensor), context, trg_mask)
+            trg_mask = self.make_trg_mask(trg_tensor)
+            output,*_ = self.decoder(
+               trg_tensor,trg_mask,context,src_mask)
             output = self.generator(output)
             _, next_word = torch.max(output[:, -1], dim=1)
-            output = output.argmax(dim=-1)
-            trg_tensor[:, i] = output[:, i]
+            trg_tensor[:, i] = next_word
+            # output = output.argmax(dim=-1)
+            # trg_tensor[:, i] = output[:, i]
+            if next_word == config.EOS_idx:
+                break
         return trg_tensor
 
     def configure_optimizers(self):
-        return
         return torch.optim.Adam(self.parameters(), lr=1e-3)
