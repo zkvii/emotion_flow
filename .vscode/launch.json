@@ -12,20 +12,20 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "--preprocess"
-                // "--model",
-                // "trans",
-                // "--devices",
-                // "0",
-                // "--batch_size",
-                // "32",
-                // "--mode",
-                // "train_and_test",
-                // "--max_epoch",
-                // "1",
-                // "--emotion_emb_type",
-                // "origin",
-                // "--code_check"
+                // "--preprocess"
+                "--model",
+                "emf",
+                "--devices",
+                "0",
+                "--batch_size",
+                "32",
+                "--mode",
+                "train_and_test",
+                "--max_epoch",
+                "1",
+                "--emotion_emb_type",
+                "tolerance",
+                "--code_check"
             ]
         }
     ]

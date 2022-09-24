@@ -1,4 +1,5 @@
 # from turtle import forward
+from model.emf import EMF
 from util.common import cal_metric
 import torch
 from pytorch_lightning import Trainer
@@ -92,6 +93,8 @@ def main():
         )
     elif config.model == 'kemp':
         model = KEMP(vocab=vocab,decoder_number=decoder_num)
+    elif config.model == 'emf':
+        model = EMF(vocab=vocab)
     # Intialization
     for n, p in model.named_parameters():
         if p.dim() > 1 and (n != "embedding.lut.weight" and config.pretrain_emb):
