@@ -24,7 +24,7 @@
                 "--max_epoch",
                 "2",
                 "--emotion_emb_type",
-                "origin",
+                "tolerance",
                 "--code_check"
             ]
         }

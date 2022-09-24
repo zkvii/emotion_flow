@@ -488,8 +488,27 @@ class EMF(LightningModule):
         trg_tensor = self.decoder_greedy(input_batch, max_length=1000)
         trg_tensor = trg_tensor.squeeze().cpu().numpy()
         decoded_words = [self.vocab.index2word[idx.item()] for idx in trg_tensor]
-        print(decoded_words)
-        pass
+        
+        return decoded_words,batch['input_txt'][0],batch['target_txt'][0],batch['program_txt'][0],batch['situation_txt'][0]
+
+    def test_epoch_end(self, outputs) -> None:
+        file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
+        # print(outputs)
+        with open(file_path,'w') as f:
+            for (predict,contexts,ref,emotion,situation) in outputs:
+                predict = ' '.join(predict)
+                context = [' '.join(context) for context in contexts]
+                ref = ' '.join(ref)
+                situation = ' '.join(situation)
+                f.write(f'context: {context})\n')
+                f.write(f'emotion: {emotion})\n')
+                f.write(f'situation: {situation})\n')
+                f.write(f'ref: {ref})\n')
+                f.write(f'predict: {predict})\n')
+                f.write('----------------------------------------\n')
+
+
+
 
     def decoder_greedy(self, input_batch, max_length):
         #trg_tensor = [batch size, trg len - 1]
@@ -510,6 +529,8 @@ class EMF(LightningModule):
             # trg_tensor[:, i] = output[:, i]
             if next_word == config.EOS_idx:
                 break
+            
+            
         return trg_tensor
 
     def configure_optimizers(self):
