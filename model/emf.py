@@ -417,7 +417,18 @@ class EMF(LightningModule):
         loss = self.criterion(
             logit.contiguous().view(-1, logit.size(-1)), dec_batch.contiguous().view(-1)
         )
-        return loss, math.exp(min(loss.item(), 100)), 0, 0
+
+        if config.label_smoothing:
+            loss_ppl = self.criterion_ppl(
+                logit.contiguous().view(-1, logit.size(-1)),
+                dec_batch.contiguous().view(-1),
+            )
+        
+        if config.label_smoothing:
+            return loss_ppl, math.exp(min(loss_ppl, 100)), 0, 0
+        else:
+            return loss, math.exp(min(loss.item(), 100)), 0, 0
+
 
     def compute_act_loss(self, module):
         R_t = module.remainders

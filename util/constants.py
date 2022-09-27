@@ -216,3 +216,15 @@ EMO_MAP={
 MAP_EMO={EMO_MAP[k]:k for k in EMO_MAP}
 EMO_MAP_RANDOM={}
 MAP_EMO_RANDOM={}
+
+SPECIAL_TOKEN_INDEX = {
+    "<UNK>": 0,
+    "<PAD>": 1,
+    "<EOS>": 2,
+    "<SOS>": 3,
+}
+
+# UNK_idx = 0
+# PAD_idx = 1
+# EOS_idx = 2
+# SOS_idx = 3

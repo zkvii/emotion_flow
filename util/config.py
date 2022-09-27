@@ -6,11 +6,11 @@ UNK_idx = 0
 PAD_idx = 1
 EOS_idx = 2
 SOS_idx = 3
-USR_idx = 4
-SYS_idx = 5
-KG_idx = 6
-CLS_idx = 7
-SEP_idx = 8
+CLS_idx = 4
+SEP_idx = 5
+USR_idx = 6
+SYS_idx = 7
+KG_idx = 8
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="data/ED")

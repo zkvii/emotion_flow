@@ -447,7 +447,7 @@ class Transformer(LightningModule):
         # Decode
         sos_token = (
             torch.LongTensor([config.SOS_idx] * enc_batch.size(0)).unsqueeze(1)
-        ).to(dec_batch.device)
+        ).to(self.device)
         dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
 
         mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)

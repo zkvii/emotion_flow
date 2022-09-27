@@ -525,7 +525,7 @@ class Dataset(data.Dataset):
             return X_dial, X_dial_ext, X_mask, X_vads, X_vad, \
                 X_concept_text, X_concept, X_concept_ext, X_concept_vads, X_concept_vad, \
                 X_oovs
-        # undefined
+        # context convert
         else:
             x_dial = [config.CLS_idx]
             x_mask = [config.CLS_idx]

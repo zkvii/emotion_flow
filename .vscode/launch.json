@@ -22,9 +22,11 @@
                 "--mode",
                 "train_and_test",
                 "--max_epoch",
-                "128",
+                "12",
                 "--emotion_emb_type",
-                "origin"
+                "tolerance",
+                "--preprocess",
+                "--code_check"
             ]
         }
     ]
