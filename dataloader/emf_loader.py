@@ -35,10 +35,14 @@ class EMFLang:
         self.word2count = {}
         self.wordEmoScore = {}
         self.n_words = 0
-        self.emo2index = emo_map
-        self.index2emo = map_emo
-        self.temo2index = emo_map_t
-        self.index2temo = map_emo_t
+        if config.emotion_emb_type == "order":
+            self.emo2index = emo_map
+            self.index2emo = map_emo
+        elif config.emotion_emb_type == "tolerance":
+            self.emo2index = emo_map_t
+            self.index2emo = map_emo_t
+        # self.temo2index = emo_map_t
+        # self.index2temo = map_emo_t
         self.set_special_token()
 
     def set_special_token(self):
@@ -104,7 +108,7 @@ def encode_context(vocab, items, data_dict):
                     emo_list.append(w[0])
 
         data_dict["context"].append(ctx_list)
-        data_dict["emotion_context"].append(emo_list)
+        data_dict["lexical_context"].append(emo_list)
 
     return data_dict
 
@@ -116,7 +120,7 @@ def encode(vocab: EMFLang, data: List):
         "target": [],
         "emotion": [],
         "situation": [],
-        "emotion_context": []
+        "lexical_context": []
     }
 
     if config.code_check:
@@ -124,7 +128,14 @@ def encode(vocab: EMFLang, data: List):
         target_list = data[1][:20]
         emotion_list = data[2][:20]
         situation_list = data[3][:20]
+    else:
+        context_list=data[0]
+        target_list = data[1]
+        emotion_list = data[2]
+        situation_list = data[3]
+    #process context
     encode_context(vocab, context_list, data_dict)
+    #process target
     data_dict['emotion'] = emotion_list
     for item in tqdm(target_list):
         item = process_sent(item)
@@ -141,6 +152,7 @@ def encode(vocab: EMFLang, data: List):
         == len(data_dict["target"])
         == len(data_dict["emotion"])
         == len(data_dict["situation"])
+        == len(data_dict["lexical_context"])
     )
 
     return data_dict
@@ -172,7 +184,7 @@ def load_dataset():
     """
     data_dir = config.data_dir
     # cache_file = f"{data_dir}/dataset_preproc.p"
-    cache_file = f"{data_dir}/ds_{config.model}.p"
+    cache_file = f"{data_dir}/ds_{config.model}_{config.emotion_emb_type}.p"
 
     vocab = EMFLang()
 
@@ -199,13 +211,19 @@ def load_dataset():
         print("[emotion]:", data_tra["emotion"][i])
         print("[context]:", [" ".join(u) for u in data_tra["context"][i]])
         print("[target]:", " ".join(data_tra["target"][i]))
-        print('-------------------------/n')
+        print('-------------------------\n')
     return data_tra, data_val, data_tst, vocab
 
+def fill_list_with_maximum(l):
+    """fill list with maximum value
+    """
+    maximum = sorted(l)[-1]
+    fill_val=maximum*2+1
+    return [fill_val if num == -1 else num for num in l]
 
 class EMFDataset(Dataset):
 
-    def __init__(self, data, vocab):
+    def __init__(self, data, vocab:EMFLang):
         """Reads source and target sequences from txt files."""
         self.vocab = vocab
         self.data = data
@@ -222,6 +240,7 @@ class EMFDataset(Dataset):
         item["situation_text"] = self.data["situation"][index]
         item["target_text"] = self.data["target"][index]
         item["emotion_text"] = [self.data["emotion"][index]]
+        item["lexical_context_text"] = self.data["lexical_context"][index]
         # context emo score for mime
         context_text = " ".join(flatten(self.data["context"][index]))
 
@@ -229,7 +248,7 @@ class EMFDataset(Dataset):
             context_text
         )
         item["context_emotion_scores"] = [context_emos['neg'],
-                                          context_emos['neu'], 
+                                          context_emos['neu'],
                                           context_emos['pos']]
         # get emotion casue words and related words
         # get emotion mask
@@ -240,54 +259,131 @@ class EMFDataset(Dataset):
     def process(self, item):
         data_sequence = {}
         for key in item:
-            if key != "context_text" and key != "context_emotion_scores":
+            if key == "emotion_text" or key == "situation_text" or key=="target_text":
                 sequence = [config.SOS_idx]+[
                     self.vocab.word2index[word]
                     if word in self.vocab.word2index else
                     config.UNK_idx for word in item[key]] \
                     + [config.EOS_idx]
                 sequence = torch.LongTensor(sequence)
-            elif key == "context_text":
+            if key == "context_text":
                 sequence = []
-                for ctx in item[key]:
-                    sequence.extend([config.SOS_idx]+[
-                        self.vocab.word2index[word]
-                        if word in self.vocab.word2index else
-                        config.UNK_idx for word in ctx]
-                        + [config.EOS_idx])
+                #to divide the context into 2 parts
+                mask_sequence=[]
+                word_count_sequence=[]
+                for i,ctx in enumerate(item[key]):
+                    one_turn_sequence=[config.SOS_idx]
+                    one_turn_count=[-1]
+                    for word in ctx:
+                        if word in self.vocab.word2index:
+                            one_turn_sequence.append(self.vocab.word2index[word])
+                            if word in item['lexical_context_text']:
+                                one_turn_count.append(self.vocab.word2index[word])
+                            else:
+                                one_turn_count.append(-1)
+                                # one_turn_key_mask.append(0)
+                        else:
+                            one_turn_sequence.append(config.UNK_idx)
+                            #unknown word focused
+                            one_turn_count.append(47)
+                            
+                    one_turn_sequence.append(config.EOS_idx)
+                    one_turn_count.append(self.vocab.word2count['<EOS>'])
+                    # sequence.extend([config.SOS_idx]+[
+                    #     self.vocab.word2index[word]
+                    #     if word in self.vocab.word2index else
+                    #     config.UNK_idx for word in ctx]
+                    #     + [config.EOS_idx])
+                    sequence.extend(one_turn_sequence)
+                    word_count_sequence.extend(one_turn_count)
+                    spk = (
+                        self.vocab.word2index["<USR>"]
+                        if i % 2 == 0
+                        else self.vocab.word2index["<SYS>"]
+                    )
+
+                    mask_sequence.extend([spk for _ in range(len(ctx)+2)])
+                mask_sequence = torch.LongTensor(mask_sequence)
+                word_count_sequence=fill_list_with_maximum(word_count_sequence)
+                word_count_seq=torch.LongTensor(word_count_sequence)
+                data_sequence['input_divide_mask'] = mask_sequence
+                data_sequence['word_count_sequence'] = word_count_seq
+
+                
                 sequence = torch.LongTensor(sequence)
-            else:
+            if key == "context_emotion_scores":
                 sequence = torch.FloatTensor(item[key])
-            data_sequence[key] = sequence
+            # if key == 'lexical_context_text':
+            #     sequence = []
+            #     for i,ctx in enumerate(item[key]):
+            #         sequence.extend([config.SOS_idx]+[
+            #             self.vocab.word2index[word]
+            #             if word in self.vocab.word2index else
+            #             config.UNK_idx for word in ctx]
+            #             + [config.EOS_idx])
+            #     sequence = torch.LongTensor(sequence)
+            data_sequence[key+'_tensor'] = sequence
+            data_sequence[key] = item[key]
         return data_sequence
 
 
-def pad_sequence(data_seq):
-    max_len=max([t.shape[0] for t in data_seq])
-    
+def pad_sequence(data_seq,is_context=False):
+    max_len = max([t.shape[0] for t in data_seq])
+    if not is_context:
+        for i in range(len(data_seq)):
+            data_seq[i] = torch.cat([data_seq[i], torch.zeros(
+                max_len-data_seq[i].shape[0]).fill_(config.PAD_idx)])
+    else:
+        #add a cls token
+        max_len+=1
+        for i in range(len(data_seq)):
+            data_seq[i] = torch.cat([torch.LongTensor([config.CLS_idx]),data_seq[i],torch.zeros(
+                max_len-data_seq[i].shape[0]).fill_(config.PAD_idx)])
+        
+    return torch.stack(data_seq)
 
 def collate_fn(data):
     # only tokenize wihout mask
-    context=[]
-    target=[]
-    situation=[]
-    emotion=[]
-    context_emo=[]
+    context = []
+    target = []
+    situation = []
+    emotion = []
+    context_emo_score = []
+    input_divide_mask = []
+    context_text=[]
+    target_text=[]
+    emotion_text=[]
+    lexical=[]
+    lexical_weight=[]
     for item in data:
-        context.append(item['context_text'])
-        target.append(item['target_text'])
-        emotion.append(item['emotion_text'])
-        context_emo.append(item['context_emotion_scores'])
-        situation.append(item['situation_text'])
-    
-    return {
-        'input_batch':torch.vstack(context),
-        'target_batch':torch.vstack(target),
-        'emotion_batch':torch.vstack(emotion),
-        'context_emo_batch':torch.vstack(context_emo),
-        'situation_batch':torch.vstack(situation)
-    }
+        context.append(item['context_text_tensor'])
+        target.append(item['target_text_tensor'])
+        emotion.append(item['emotion_text_tensor'])
+        context_emo_score.append(item['context_emotion_scores_tensor'])
+        situation.append(item['situation_text_tensor'])
+        input_divide_mask.append(item['input_divide_mask'])
 
+        context_text.append(item['context_text'])
+        target_text.append(item['target_text'])
+        emotion_text.append(item['emotion_text'])
+    context = pad_sequence(context,is_context=True).long()
+    target = pad_sequence(target).long()
+    emotion = pad_sequence(emotion).long()
+    context_emo_score = pad_sequence(context_emo_score).float()
+    input_divide_mask = pad_sequence(input_divide_mask,is_context=True).long()
+    # situation = pad_sequence(situation)
+
+    return {
+        'input_batch':context,
+        'target_batch':target,
+        'emotion_batch':emotion,
+        'context_emo_batch':context_emo_score,
+        'input_divide_mask':input_divide_mask,
+        'context_text':context_text,
+        'target_text':target_text,
+        'emotion_text':emotion_text
+        # 'situation_batch':situation
+    }
 
 
 def prepare_data_seq(batch_size=32):

@@ -1,4 +1,4 @@
-DATA_FILES = lambda data_dir: {
+def DATA_FILES(data_dir): return {
     "train": [
         f"{data_dir}/sys_dialog_texts.train.npy",
         f"{data_dir}/sys_target_texts.train.npy",
@@ -18,6 +18,7 @@ DATA_FILES = lambda data_dir: {
         f"{data_dir}/sys_situation_texts.test.npy",
     ],
 }
+
 
 WORD_PAIRS = {
     "it's": "it is",
@@ -116,112 +117,117 @@ MAP_EMO_ORIGIN = {
     31: "faithful",
 }
 
-EMO_MAP_T={
+EMO_MAP_T = {
 
-    'angry':0,
-    'annoyed':0,
-    'jealous':0,
-    'furious':0,
+    'angry': 0,
+    'annoyed': 0,
+    'jealous': 0,
+    'furious': 0,
 
-    'afraid':1,
-    'terrified':1,
-    'anxious':1,
-    'apprehensive':1,
+    'afraid': 1,
+    'terrified': 1,
+    'anxious': 1,
+    'apprehensive': 1,
 
-    'sad':2,
-    'disappointed':2,
-    'devastated':2,
-    'lonely':2,
-    'nostalgic':2,
-    'sentimental':2,
-      
-    'disgusted':3,
-    'embarrassed':3,
-    'guilty':3,
-    'ashamed':3,
-    
-    'faithful':4,
-    'trusting':4,
-    'grateful':4,
-    'caring':4,
-    'hopeful':4,
-    
-    'anticipating':5,
-    'prepared':5,
-    'confident':5,
-        
-    'proud':6,
-    'impressed':6,
-    'content':6,
-    
-    'excited':7,
-    'surprised':7,
-    'joyful':7,
-    
+    'sad': 2,
+    'disappointed': 2,
+    'devastated': 2,
+    'lonely': 2,
+    'nostalgic': 2,
+    'sentimental': 2,
+
+    'disgusted': 3,
+    'embarrassed': 3,
+    'guilty': 3,
+    'ashamed': 3,
+
+    'faithful': 4,
+    'trusting': 4,
+    'grateful': 4,
+    'caring': 4,
+    'hopeful': 4,
+
+    'anticipating': 5,
+    'prepared': 5,
+    'confident': 5,
+
+    'proud': 6,
+    'impressed': 6,
+    'content': 6,
+
+    'excited': 7,
+    'surprised': 7,
+    'joyful': 7,
+
 }
 
-MAP_EMO_T={
-    0:'angry',
-    1:'afraid',
-    2:'sad',
-    3:'disgusted',
-    4:'faithful',
-    5:'anticipating',
-    6:'proud',
-    7:'exited',
+MAP_EMO_T = {
+    0: 'angry',
+    1: 'afraid',
+    2: 'sad',
+    3: 'disgusted',
+    4: 'faithful',
+    5: 'anticipating',
+    6: 'proud',
+    7: 'exited',
 }
 
-EMO_MAP={
-    'angry':0,
-    'annoyed':1,
-    'jealous':2,
-    'furious':3,
+EMO_MAP = {
+    'angry': 0,
+    'annoyed': 1,
+    'jealous': 2,
+    'furious': 3,
 
-    'afraid':4,
-    'terrified':5,
-    'anxious':6,
-    'apprehensive':7,
+    'afraid': 4,
+    'terrified': 5,
+    'anxious': 6,
+    'apprehensive': 7,
 
-    'sad':8,
-    'disappointed':9,
-    'devastated':10,
-    'lonely':11,
-    'nostalgic':12,
-    'sentimental':13,
-      
-    'disgusted':14,
-    'embarrassed':15,
-    'guilty':16,
-    'ashamed':17,
-    
-    'faithful':18,
-    'trusting':19,
-    'grateful':20,
-    'caring':21,
-    'hopeful':22,
-    
-    'anticipating':23,
-    'prepared':24,
-    'confident':25,
-        
-    'proud':26,
-    'impressed':27,
-    'content':28,
-    
-    'excited':29,
-    'surprised':30,
-    'joyful':31,
+    'sad': 8,
+    'disappointed': 9,
+    'devastated': 10,
+    'lonely': 11,
+    'nostalgic': 12,
+    'sentimental': 13,
+
+    'disgusted': 14,
+    'embarrassed': 15,
+    'guilty': 16,
+    'ashamed': 17,
+
+    'faithful': 18,
+    'trusting': 19,
+    'grateful': 20,
+    'caring': 21,
+    'hopeful': 22,
+
+    'anticipating': 23,
+    'prepared': 24,
+    'confident': 25,
+
+    'proud': 26,
+    'impressed': 27,
+    'content': 28,
+
+    'excited': 29,
+    'surprised': 30,
+    'joyful': 31,
 }
 
-MAP_EMO={EMO_MAP[k]:k for k in EMO_MAP}
-EMO_MAP_RANDOM={}
-MAP_EMO_RANDOM={}
+MAP_EMO = {EMO_MAP[k]: k for k in EMO_MAP}
+EMO_MAP_RANDOM = {}
+MAP_EMO_RANDOM = {}
 
 SPECIAL_TOKEN_INDEX = {
     "<UNK>": 0,
     "<PAD>": 1,
     "<EOS>": 2,
     "<SOS>": 3,
+    "<CLS>": 4,
+    "<SEP>": 5,
+    "<USR>": 6,
+    "<SYS>": 7,
+    "<KG>": 8
 }
 
 # UNK_idx = 0

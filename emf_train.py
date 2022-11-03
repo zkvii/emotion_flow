@@ -1,12 +1,9 @@
 from util.common import load_best_path, save_best_hparams, save_best_path
 from model.emf import EMF
-from util.common import cal_metric
 import torch
 from pytorch_lightning import Trainer
-from util.eval import cal_one_model
-# from tqdm import tqdm
+from pytorch_lightning.callbacks import EarlyStopping
 from dataloader.emf_loader import prepare_data_seq
-
 from util import config
 from torch.nn.init import xavier_normal_
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -17,7 +14,7 @@ warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['CUDA_VISIBLE_DEVICES'] = config.devices
-
+# os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 logger = TensorBoardLogger(
     "emf_logs",
     name=f"{config.model}",
@@ -47,7 +44,7 @@ def preprocess():
 def main():
     """main func
     """
-    train_loader, dev_loader, test_loader, vocab, decoder_num = prepare_data_seq(
+    train_loader, dev_loader, test_loader, vocab = prepare_data_seq(
         batch_size=config.batch_size
     )
 
@@ -58,14 +55,15 @@ def main():
             xavier_normal_(p)
 
     checkpoint_callback = ModelCheckpoint(
-        monitor="valid_ppl", filename=f"{config.model}-{config.emotion_emb_type}", mode="min")
+        monitor="valid_loss", filename=f"{config.model}-{config.emotion_emb_type}", mode="min")
 
-
+    early_stopping = EarlyStopping('valid_loss', patience=5, mode='min')
     trainer = Trainer(
-        max_epochs=config.max_epoch,
         accelerator='gpu',
-        callbacks=[checkpoint_callback],
-        logger=logger
+        callbacks=[checkpoint_callback,early_stopping],
+        logger=logger,
+        min_epochs=config.min_epoch,
+        min_steps=config.min_epoch,
     )
     print_opts(config.args)
 

@@ -127,7 +127,13 @@ class Translator(object):
                 db_dist = None
 
                 prob = self.model.generator(
-                    dec_output
+                    dec_output,
+                    # attn_dist,
+                    # enc_batch_extend_vocab,
+                    # extra_zeros,
+                    # 1,
+                    # True,
+                    # attn_dist_db=db_dist,
                 )
                 # prob = F.log_softmax(prob,dim=-1) #fix the name later
                 word_prob = prob[:, -1]
@@ -199,7 +205,7 @@ class Translator(object):
 
             mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-            emb_mask = self.model.embedding(src_seq["input_mask"])
+            emb_mask = self.model.embedding(src_seq["input_divide_mask"])
             src_enc = self.model.encoder(
                 self.model.embedding(enc_batch) + emb_mask, mask_src
             )
@@ -264,8 +270,8 @@ class Translator(object):
         for d in batch_hyp:
             ret_sentences.append(
                 " ".join([self.model.vocab.index2word[idx] for idx in d[0]]).replace(
-                    "EOS", ""
-                )
+                    "<EOS>", ""
+                ).replace("<>", "")
             )
 
         return ret_sentences  # , batch_scores
@@ -286,22 +292,22 @@ def sequence_mask(sequence_length, max_len=None):
 
 def get_input_from_batch(batch):
     enc_batch = batch["input_batch"]
-    enc_lens = batch["input_lengths"]
-    batch_size, max_enc_len = enc_batch.size()
-    assert enc_lens.size(0) == batch_size
+    # enc_lens = batch["input_lengths"]
+    # batch_size, max_enc_len = enc_batch.size()
+    # assert enc_lens.size(0) == batch_size
 
-    enc_padding_mask = sequence_mask(enc_lens, max_len=max_enc_len).float()
+    # enc_padding_mask = sequence_mask(enc_lens, max_len=max_enc_len).float()
 
     extra_zeros = None
     enc_batch_extend_vocab = None
 
-    if config.pointer_gen:
-        enc_batch_extend_vocab = batch["input_ext_vocab_batch"]
-        # max_art_oovs is the max over all the article oov list in the batch
-        if batch["max_art_oovs"] > 0:
-            extra_zeros = torch.zeros((batch_size, batch["max_art_oovs"]))
+    # # if config.pointer_gen:
+    # #     enc_batch_extend_vocab = batch["input_ext_vocab_batch"]
+    # #     # max_art_oovs is the max over all the article oov list in the batch
+    # #     if batch["max_art_oovs"] > 0:
+    # #         extra_zeros = torch.zeros((batch_size, batch["max_art_oovs"]))
 
-    c_t_1 = torch.zeros((batch_size, 2 * config.hidden_dim))
+    # c_t_1 = torch.zeros((batch_size, 2 * config.hidden_dim))
 
     coverage = None
     if config.is_coverage:
@@ -311,15 +317,18 @@ def get_input_from_batch(batch):
         enc_batch_extend_vocab.to(enc_batch.device)
     if extra_zeros is not None:
         extra_zeros.to(enc_batch.device)
-    c_t_1.to(enc_batch.device)
+    # c_t_1.to(enc_batch.device)
 
     return (
         enc_batch,
-        enc_padding_mask,
-        enc_lens,
+        # enc_padding_mask,
+        None,
+        # enc_lens,
+        None,
         enc_batch_extend_vocab,
         extra_zeros,
-        c_t_1,
+        # c_t_1,
+        None,
         coverage,
     )
 

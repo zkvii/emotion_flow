@@ -21,12 +21,10 @@
                 "32",
                 "--mode",
                 "train_and_test",
-                "--max_epoch",
-                "12",
+                "--min_epoch",
+                "50",
                 "--emotion_emb_type",
                 "tolerance",
-                "--preprocess",
-                "--code_check"
             ]
         }
     ]

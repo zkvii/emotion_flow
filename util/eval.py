@@ -200,5 +200,5 @@ def cal_one_model(file, opt=''):
 
 
 if __name__ == '__main__':
-    cal_one_model('./predicts/trans-origin-results.txt')
+    cal_one_model('./predicts/emf-tolerance-results.txt')
 

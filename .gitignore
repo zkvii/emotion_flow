@@ -174,7 +174,9 @@ save
 lightning_logs/
 
 em_logs/
-emlogs/**
+em_logs/**
+emf_logs/
+emf_logs/**
 only_train
 only_train/**
 train_and_test

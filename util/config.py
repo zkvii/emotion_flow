@@ -49,6 +49,7 @@ parser.add_argument("--mean_query", action="store_true")
 parser.add_argument("--schedule", type=float, default=10000)
 parser.add_argument("--max_dec_step", type=int, default=50)
 parser.add_argument("--max_epoch", type=int, default=100)
+parser.add_argument("--min_epoch", type=int, default=10)
 
 
 parser.add_argument("--woEMO", default=False, action="store_true")
@@ -139,6 +140,7 @@ cov_loss_wt = 1.0
 lr_coverage = 0.15
 eps = 1e-12
 max_epoch = args.max_epoch
+min_epoch = args.min_epoch
 max_seq_length=args.max_seq_length
 dropout = args.dropout
 

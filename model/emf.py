@@ -2,10 +2,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from util.ctloss import ContrastiveTokenLoss, contrastive_token_loss
 import numpy as np
 import math
-from dataloader.loader import Lang
+from dataloader.emf_loader import EMFLang
 from model.common import (
     EncoderLayer,
     DecoderLayer,
@@ -22,8 +22,8 @@ from model.common import (
 from util import config
 from pytorch_lightning import LightningModule
 from sklearn.metrics import accuracy_score
+# from model.translator.emf_translator import beam_decode
 from model.translator.emf_translator import Translator
-
 
 class Encoder(LightningModule):
     """
@@ -293,13 +293,16 @@ class Generator(LightningModule):
 class EMF(LightningModule):
     def __init__(
         self,
-        vocab:Lang
+        vocab:EMFLang
     ):
         super(EMF, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.n_words
 
         self.embedding = share_embedding(self.vocab, config.pretrain_emb)
+        #for simplicity, we use the same embedding for both encoder and decoder
+        # self.embedding = share_embedding(self.vocab, config.pretrain_emb)
+        self.emo_embedding = nn.Embedding(self.vocab.n_words, config.hidden_dim)
         self.encoder = Encoder(
             config.emb_dim,
             config.hidden_dim,
@@ -310,6 +313,8 @@ class EMF(LightningModule):
             filter_size=config.filter,
             universal=config.universal,
         )
+        self.generator = Generator(config.hidden_dim, self.vocab_size)
+        # self.emo_generator = Generator(config.hidden_dim, 32) 
 
         # multiple decoders
         self.decoder = Decoder(
@@ -323,7 +328,7 @@ class EMF(LightningModule):
         )
 
         self.generator = Generator(config.hidden_dim, self.vocab_size)
-
+        self.emo_gen=Generator(config.hidden_dim, len(vocab.emo2index))
         if config.weight_sharing:
             # Share the weight matrix between target word embedding & the final logit dense layer
             self.generator.proj.weight = self.embedding.lut.weight
@@ -334,8 +339,9 @@ class EMF(LightningModule):
                 size=self.vocab_size, padding_idx=config.PAD_idx, smoothing=0.1
             )
             self.criterion_ppl = nn.NLLLoss(ignore_index=config.PAD_idx)
-        self.res = {}
-        self.gdn = {}
+        self.ct_criterion = ContrastiveTokenLoss(pad_id=config.PAD_idx)
+        # self.res = {}
+        # self.gdn = {}
 
     def training_step(self, batch, batch_idx):
         loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
@@ -355,79 +361,78 @@ class EMF(LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
+        # loss, ppl, bce, acc = self.train_one_batch(batch, batch_idx)
 
         file_path = f'./predicts/{config.model}-{config.emotion_emb_type}-results.txt'
         outputs = open(file_path, 'a+', encoding='utf-8')
-        self.log('test_ppl', ppl)
-        self.log('test_loss', loss)
-        self.log('test_bce', bce)
-        self.log('test_acc', acc)
         sent_g = self.decoder_greedy(batch)
         t = Translator(self, self.vocab)
         sent_b = t.beam_search(batch, max_dec_step=config.max_dec_step)
         ref, hyp_g = [], []
         for i, greedy_sent in enumerate(sent_g):
-            rf = " ".join(batch["target_txt"][i])
+            rf = " ".join(batch["target_text"][i])
             hyp_g.append(greedy_sent)
             ref.append(rf)
-            self.res[batch_idx] = greedy_sent.split()
-            self.gdn[batch_idx] = batch["target_txt"][i]  # targets.split()
-            outputs.write("Emotion:{} \n".format(batch["program_txt"][i]))
-            outputs.write("Context:{} \n".format(
-                [" ".join(s) for s in batch['input_txt'][i]]))
-            # outputs.write("Concept:{} \n".format(batch["concept_txt"]))
-            outputs.write("Pred:{} \n".format(greedy_sent))
+            outputs.write(f"Emotion:{batch['emotion_text'][i]} \n")
+            outputs.write(f"Context:{[' '.join(s) for s in batch['context_text'][i]]} \n")
+            outputs.write(f"Pred:{greedy_sent}\n")
             outputs.write(f"Beam:{sent_b[i]} \n")
-            outputs.write("Ref:{} \n".format(rf))
+            outputs.write(f"Ref:{rf} \n")
+            outputs.write("--------------------------------------------------\n")
 
-        return loss
+        # return loss
 
     def train_one_batch(self, batch, iter, train=True):
         enc_batch = batch['input_batch']
         dec_batch = batch['target_batch']
 
-        # if config.noam:
-        #     self.optimizer.optimizer.zero_grad()
-        # else:
-        #     self.optimizer.zero_grad()
-
-        # Encode
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
 
-        emb_mask = self.embedding(batch["input_mask"])
+        #input mask divide user part and machine part
+        emb_mask = self.embedding(batch["input_divide_mask"])
+        #embedding emotion ,set to last token
+        emo_emb = self.emo_embedding(batch["input_batch"])
+        emb_mask=emb_mask+emo_emb
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
-        # Decode
-        sos_token = (
-            torch.LongTensor([config.SOS_idx] * enc_batch.size(0)).unsqueeze(1)
-        ).to(self.device)
-        dec_batch_shift = torch.cat((sos_token, dec_batch[:, :-1]), 1)
-
-        mask_trg = dec_batch_shift.data.eq(config.PAD_idx).unsqueeze(1)
+        # encoder_outputs = self.encoder(
+        #     self.embedding(enc_batch) + emb_mask, mask_src)
+        dec_batch_shift = dec_batch[:, :-1]
+        dec_batch=dec_batch[:,1:]
+        mask_trg = dec_batch.data.eq(config.PAD_idx).unsqueeze(1)
         pre_logit, attn_dist = self.decoder(
             self.embedding(
                 dec_batch_shift), encoder_outputs, (mask_src, mask_trg)
         )
-
+        #check distribution of emotion
+        emo_label=self.emo_gen(pre_logit[:,1,:]).detach().cpu()
+        emo_target=torch.LongTensor([self.vocab.emo2index[word[0]] for word in batch["emotion_text"]])
+        emo_loss=F.cross_entropy(emo_label.view(emo_target.shape[0],-1),emo_target)
+        #alpha = 0.2
         # compute output dist
         logit = self.generator(pre_logit)
         # logit = F.log_softmax(logit,dim=-1) #fix the name later
         # loss: NNL if ptr else Cross entropy
-        loss = self.criterion(
-            logit.contiguous().view(-1, logit.size(-1)), dec_batch.contiguous().view(-1)
-        )
+        # loss = self.criterion(
+        #     logit.contiguous().view(-1, logit.size(-1)), dec_batch.contiguous().view(-1)
+        # )
 
         if config.label_smoothing:
             loss_ppl = self.criterion_ppl(
                 logit.contiguous().view(-1, logit.size(-1)),
                 dec_batch.contiguous().view(-1),
             )
-        
-        if config.label_smoothing:
-            return loss_ppl, math.exp(min(loss_ppl, 100)), 0, 0
-        else:
-            return loss, math.exp(min(loss.item(), 100)), 0, 0
+        ct_loss=self.ct_criterion(logit,dec_batch)
+        ad_loss=ct_loss+emo_loss.to(self.device)
+        # ad_loss = emo_loss.to(self.device)
+        # loss=0.1*loss+0.2*ad_loss
+
+        # return loss, math.exp(min(loss.item(), 100)), 0, 0
+        loss_ppl=0.8*loss_ppl+0.2*ad_loss
+        # if config.label_smoothing:
+        return loss_ppl, math.exp(min(loss_ppl, 100)), 0, 0
+        # else:
+        #     return loss, math.exp(min(loss.item(), 100)), 0, 0
 
 
     def compute_act_loss(self, module):
@@ -441,11 +446,14 @@ class EMF(LightningModule):
     def decoder_greedy(self, batch, max_dec_step=30):
         enc_batch = batch['input_batch']
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["input_mask"])
+        emb_mask = self.embedding(batch["input_divide_mask"])
+
+        # emo_emb = self.emo_embedding(batch["input_batch"])
+        # emb_mask=emb_mask+emo_emb
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
 
-        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(emb_mask.device)
+        ys = torch.ones(1, 1).fill_(config.SOS_idx).long().to(self.device)
         mask_trg = ys.data.eq(config.PAD_idx).unsqueeze(1)
         decoded_words = []
         for i in range(max_dec_step + 1):
@@ -498,7 +506,7 @@ class EMF(LightningModule):
     def decoder_topk(self, batch, max_dec_step=30):
         enc_batch = batch["input_batch"]
         mask_src = enc_batch.data.eq(config.PAD_idx).unsqueeze(1)
-        emb_mask = self.embedding(batch["input_mask"])
+        emb_mask = self.embedding(batch["input_divide_mask"])
         encoder_outputs = self.encoder(
             self.embedding(enc_batch) + emb_mask, mask_src)
 
